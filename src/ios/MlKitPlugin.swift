@@ -28,8 +28,9 @@ var _command: CDVInvokedUrlCommand!
         case INVALID
         case GETTEXT
         case GETLABLE
+        case GETFACE
         
-        static let allValues = [INVALID,GETTEXT,GETLABLE]
+        static let allValues = [INVALID,GETTEXT,GETLABLE,GETFACE]
         
     }
 
@@ -161,7 +162,6 @@ var _command: CDVInvokedUrlCommand!
         }
     }
 
-
     func runLabelIdentifier(for image:VisionImage,onCloud cloud:Bool,call command:CDVInvokedUrlCommand){
         if cloud {
             let labelDetector = vision?.cloudImageLabeler() ?? Vision.vision().cloudImageLabeler()
@@ -195,6 +195,167 @@ var _command: CDVInvokedUrlCommand!
         }
         
         self.sendPluginResult(message: json, call: _command)
+    }
+    
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    //                               Face Detection                                 //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+
+    @objc(getFace:)
+    func getFace(command: CDVInvokedUrlCommand){
+        //options = [String:Any]()
+        action = Actions.GETFACE
+        _command=command
+        let takePicture = command.argument(at: 0, withDefault: false) as! Bool
+        
+        options = (command.argument(at: 1, withDefault:["no":"no"]) as! [String:Any])
+        
+        vision = Vision.vision()
+        if takePicture{
+            commandDelegate.run(inBackground: {
+                self.useCamera()
+            })
+        }else{
+            commandDelegate.run(inBackground: {
+                self.useCameraRoll()
+            })
+        }
+    }
+
+    func runFaceDetection(for image:VisionImage,with options:VisionFaceDetectorOptions,call command:CDVInvokedUrlCommand) {
+        
+        let faceDetector:VisionFaceDetector = vision?.faceDetector(options: options) ?? Vision.vision().faceDetector(options: options);
+        
+        faceDetector.process(image, completion: {result, error in
+            
+            guard error == nil, let result:[VisionFace] = result else{
+                let errorString = error?.localizedDescription ?? "No Result"
+                self.sendPluginError(message: errorString, call: command)
+                return
+            }
+            
+            var json:[[String:Any]] = Array(repeating:["test":"test"],count: 0)
+            
+            var idxFace = 0
+            for face in result{
+                var faceJson = [String:Any]()
+                
+                let bounds = face.frame
+                
+                faceJson["Bounds"] = self.rectToJson(for: bounds)
+                
+                // Head is rotated to the right rotY degrees
+                if face.hasHeadEulerAngleY {
+                    faceJson["RotY"] = face.headEulerAngleY
+                }
+                
+                // Head is tilted sideways rotZ degrees
+                if face.hasHeadEulerAngleZ {
+                    faceJson["RotZ"] = face.headEulerAngleZ
+                }
+                
+                // If landmark detection was enabled (mouth, ears, eyes, cheeks, and
+                // nose available):
+                if options.landmarkMode == VisionFaceDetectorLandmarkMode.all {
+                    
+                    var landmarks:[[String:Any]] = Array(repeating: ["test":"test"], count: 0)
+                    
+                    let landmarksValues = [FaceLandmarkType.mouthBottom
+                        , FaceLandmarkType.leftCheek
+                        , FaceLandmarkType.leftEar
+                        , FaceLandmarkType.leftEye
+                        , FaceLandmarkType.mouthLeft
+                        , FaceLandmarkType.noseBase
+                        , FaceLandmarkType.rightCheek
+                        , FaceLandmarkType.rightEar
+                        , FaceLandmarkType.rightEye
+                        , FaceLandmarkType.mouthRight]
+                    for landmarkValue in landmarksValues {
+                        let landmarkOptional = face.landmark(ofType: landmarkValue)
+                        if let landmark:VisionFaceLandmark = landmarkOptional{
+                            
+                            let landmarkJson:[String:Any] = self.landmarkToJson(for: landmark)
+                            landmarks.append(landmarkJson)
+                        }
+                    }
+                    if landmarks.count>0 {
+                        faceJson["Landmarks"] = landmarks
+                    }
+                    
+                }
+                
+                // If contour detection was enabled:
+                if options.contourMode == VisionFaceDetectorContourMode.all {
+                    var contours:[[String:Any]] = Array(repeating: ["test":"test"], count: 0)
+                    
+                    let contoursValues = [FaceContourType.all
+                        , FaceContourType.face
+                        , FaceContourType.leftEyebrowTop
+                        , FaceContourType.leftEyebrowBottom
+                        , FaceContourType.rightEyebrowTop
+                        , FaceContourType.rightEyebrowBottom
+                        , FaceContourType.leftEye
+                        , FaceContourType.rightEye
+                        , FaceContourType.upperLipTop
+                        , FaceContourType.upperLipBottom
+                        , FaceContourType.lowerLipTop
+                        , FaceContourType.lowerLipBottom
+                        , FaceContourType.noseBridge
+                        , FaceContourType.noseBottom]
+                    for contourValue in contoursValues {
+                        let contourOptional = face.contour(ofType: contourValue)
+                        if let contour:VisionFaceContour = contourOptional{
+                            
+                            let contourJson:[String:Any] = self.contourToJson(for: contour)
+                            contours.append(contourJson)
+                        }
+                    }
+                    if contours.count>0 {
+                        faceJson["Contours"] = contours
+                    }
+                }
+                
+                // If classification was enabled:
+                if options.classificationMode == VisionFaceDetectorClassificationMode.all {
+                    var classification = [String:Any]()
+                    if face.hasSmilingProbability {
+                        classification["SmileProbability"] = face.smilingProbability
+                    }
+                    
+                    if face.hasLeftEyeOpenProbability {
+                        classification["LeftEyeOpenProbability"] = face.leftEyeOpenProbability
+                    }
+                    
+                    if face.hasRightEyeOpenProbability {
+                        classification["RightEyeOpenProbability"] = face.rightEyeOpenProbability
+                    }
+                    faceJson["Classification"] = classification
+                }
+                
+                // If face tracking was enabled:
+                if options.isTrackingEnabled {
+                    faceJson["TrackingId"] = face.trackingID
+                }
+                
+                
+                if faceJson.count > 0 {
+                    json.append(faceJson)
+                    idxFace = idxFace + 1
+                }
+            }
+            
+            if json.count > 0{
+                self.sendPluginResult(message: json, call: command)
+            }else{
+                self.sendPluginError(message: "No Result", call: command)
+            }
+            
+            
+        })
     }
     
     
@@ -280,6 +441,20 @@ var _command: CDVInvokedUrlCommand!
     // //////////////////////////////////////////////////////////////////////////// //
     // //////////////////////////////////////////////////////////////////////////// //
     // //////////////////////////////////////////////////////////////////////////// //
+
+    func contourToJson (for contour:VisionFaceContour) -> [String:Any]{
+        let contourPoints =  pointsToJson(for: contour.points)
+        var contourJson = [String:Any]()
+        contourJson[contour.type.rawValue] = contourPoints
+        return contourJson
+    }
+    
+    func landmarkToJson (for landmark:VisionFaceLandmark) -> [String:Any]{
+        let landmarkPoint =  pointToJson(for: landmark.position)
+        var landmarkJson = [String:Any]()
+        landmarkJson[landmark.type.rawValue] = landmarkPoint
+        return landmarkJson
+    }
     
     func callMlKitImage(for image:UIImage){
         let visionImage = VisionImage.init(image: image)

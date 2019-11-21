@@ -24,7 +24,7 @@
         <hook type="after_plugin_install" src="hooks/android/after_plugin_install.js" />
         <hook type="before_plugin_uninstall" src="hooks/android/before_plugin_uninstall.js" />
 
-        <source-file src="src/android/mlkitplugin.java" target-dir="src/com/outsystems/mlkitplugin/MlKitPlugin" />
+        <source-file src="src/android/MlKitPlugin.java" target-dir="src/com/outsystems/mlkitplugin/MlKitPlugin" />
 
         <config-file parent="/*" target="AndroidManifest.xml">
             <uses-permission android:name="android.permission.CAMERA" />
@@ -50,6 +50,7 @@
 		<framework src="com.google.android.gms:play-services-tagmanager:16.0.4" />
 		<framework src="com.google.firebase:firebase-core:16.0.4" />
         <framework src="com.google.firebase:firebase-ml-vision-image-label-model:17.0.2" />
+        <framework src="com.google.firebase:firebase-ml-vision-face-model:17.0.2" />
 
     </platform>
 
@@ -93,6 +94,7 @@
         <framework src="FirebaseAnalytics" type="podspec" spec="~>5.4.0" />
         <framework src="FirebaseMLVisionTextModel" type="podspec" spec="~>0.15.0" />
         <framework src="FirebaseMLVisionLabelModel" type="podspec" spec="~>0.15.0" />
+        <framework src="FirebaseMLVisionFaceModel" type="podspec" spec="~>0.15.0" />
 
     </platform>
 </plugin>
