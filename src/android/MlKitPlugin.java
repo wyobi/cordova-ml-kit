@@ -142,6 +142,15 @@ public class MlKitPlugin extends CordovaPlugin {
                     isValid = false;
                 }
                 return isValid ? "" : a.argsDesc;
+            case GETLABLE:
+                isValid = args.length() == 2;
+                try {
+                    args.getBoolean(0);
+                    args.getBoolean(1);
+                } catch (JSONException e) {
+                    isValid = false;
+                }
+                return isValid ? "" : a.argsDesc;
             default:
                 return Actions.INVALID.argsDesc;
         }
@@ -149,7 +158,8 @@ public class MlKitPlugin extends CordovaPlugin {
 
     enum Actions {
         INVALID("", "Invalid action"),
-        GETTEXT("getText", "Invalid arguments-> takePicture: Bool, onCloud: Bool, language: String"),;
+        GETTEXT("getText", "Invalid arguments-> takePicture: Bool, onCloud: Bool, language: String"),
+        GETLABLE("getLabel","Invalid arguments-> takePicture: Bool, onCloud: Bool");
 
         String name;
         String argsDesc;
@@ -245,6 +255,61 @@ public class MlKitPlugin extends CordovaPlugin {
         }
     }
 
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    //                             Label Identification                           //
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+
+
+    private void runLabelRecognition(final CallbackContext callbackContext, Bitmap img,Boolean onCloud) {
+
+        FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(img);
+        FirebaseVisionImageLabeler labeler;
+        if (onCloud){
+            labeler = FirebaseVision.getInstance().getCloudImageLabeler();
+        }else{
+            labeler = FirebaseVision.getInstance().getOnDeviceImageLabeler();
+        }
+
+        labeler.processImage(image)
+                .addOnSuccessListener(new OnSuccessListener<List<FirebaseVisionImageLabel>>() {
+                    @Override
+                    public void onSuccess(List<FirebaseVisionImageLabel> labels) {
+                        JSONArray json = new JSONArray();
+
+                        for (FirebaseVisionImageLabel label: labels){
+                            try {
+
+                                String text = label.getText();
+                                String entityId = label.getEntityId();
+                                float confidence = label.getConfidence();
+
+                                JSONObject jsonObject = new JSONObject();
+                                jsonObject.put("text", text);
+                                jsonObject.put("entityId", entityId);
+                                jsonObject.put("confidence", confidence);
+
+                                json.put(jsonObject);
+
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                        callbackContext.success(json.toString());
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        e.printStackTrace();
+                        callbackContext.error(e.getMessage());
+                    }
+                });
+    }
+
 
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
@@ -299,46 +364,6 @@ public class MlKitPlugin extends CordovaPlugin {
                 Log.d(TAG, "Error: You don't have a default camera.  Your device may not be CTS complaint.");
             }
         }
-    }
-
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode,resultCode,data);
-        if (resultCode == RESULT_OK){
-            if (requestCode == TAKE_PICTURE_REQUEST_CODE) {
-                try{
-                    Activity act = this.cordova.getActivity();
-                    String packagename = act.getComponentName().getPackageName();
-                    Uri imageUri = FileProvider.getUriForFile(
-                            act,
-                            packagename, //(use your app signature + ".provider" )
-                            tempImage);
-                    final Bitmap imageBitmap = MediaStore.Images.Media.getBitmap(cordova.getActivity().getContentResolver(),imageUri);
-
-                    cordova.getThreadPool().execute(() -> runTextRecognition(_callbackContext, imageBitmap, options.optString("language",""), onCloud));
-                    //call text identification, label recognition, face detection
-
-                    return;
-                }catch (IOException e){
-                    _callbackContext.error("Could not retrieve image!");
-                    return;
-                }
-            }else if (requestCode == OPEN_GALLERY_REQUEST_CODE){
-                Uri selectedImage = data.getData();
-                try{
-                    final Bitmap imageBitmap = MediaStore.Images.Media.getBitmap(cordova.getActivity().getContentResolver(),selectedImage);
-                    //call text identification, label recognition, face detection
-                    cordova.getThreadPool().execute(() -> runTextRecognition(_callbackContext, imageBitmap, options.optString("language",""), onCloud));
-
-                    return;
-                }catch (IOException e){
-                    _callbackContext.error("Could not retrieve image!");
-                    return;
-                }
-            }
-        }
-        _callbackContext.error("No Image Selected!");
-
-
     }
 
     protected void requestPermission(String permission, int requestId) throws Exception {
@@ -420,6 +445,45 @@ public class MlKitPlugin extends CordovaPlugin {
         }
     }
 
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode,resultCode,data);
+        if (resultCode == RESULT_OK){
+            if (requestCode == TAKE_PICTURE_REQUEST_CODE) {
+                try{
+                    Activity act = this.cordova.getActivity();
+                    String packagename = act.getComponentName().getPackageName();
+                    Uri imageUri = FileProvider.getUriForFile(
+                            act,
+                            packagename, //(use your app signature + ".provider" )
+                            tempImage);
+                    final Bitmap imageBitmap = MediaStore.Images.Media.getBitmap(cordova.getActivity().getContentResolver(),imageUri);
+
+                    //call text identification, label recognition, face detection
+                    callML(imageBitmap);
+
+                    return;
+                }catch (IOException e){
+                    _callbackContext.error("Could not retrieve image!");
+                    return;
+                }
+            }else if (requestCode == OPEN_GALLERY_REQUEST_CODE){
+                Uri selectedImage = data.getData();
+                try{
+                    final Bitmap imageBitmap = MediaStore.Images.Media.getBitmap(cordova.getActivity().getContentResolver(),selectedImage);
+                    //call text identification, label recognition, face detection
+                    callML(imageBitmap);
+
+
+                    return;
+                }catch (IOException e){
+                    _callbackContext.error("Could not retrieve image!");
+                    return;
+                }
+            }
+        }
+        _callbackContext.error("No Image Selected!");
+    }
+
 
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
@@ -429,7 +493,16 @@ public class MlKitPlugin extends CordovaPlugin {
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
 
-
+    private void callML(Bitmap image){
+        switch (myAction){
+            case GETTEXT:
+                cordova.getThreadPool().execute(() -> runTextRecognition(_callbackContext, image, options.optString("language",""), onCloud));
+                break;
+            case GETLABLE:
+                cordova.getThreadPool().execute(() -> runLabelRecognition(_callbackContext, image,onCloud));
+                break;
+        }
+    }
     private JSONObject rectToJson(Rect rect) throws JSONException {
         JSONObject oBloundingBox = new JSONObject();
         oBloundingBox.put("left", rect.left);

@@ -1,4 +1,4 @@
-/********* MlFirebasePlugin.m Cordova Plugin Implementation *******/
+/********* MlKitPlugin.m Cordova Plugin Implementation *******/
 
 import Foundation
 
@@ -27,8 +27,9 @@ var _command: CDVInvokedUrlCommand!
     enum Actions {
         case INVALID
         case GETTEXT
+        case GETLABLE
         
-        static let allValues = [INVALID,GETTEXT]
+        static let allValues = [INVALID,GETTEXT,GETLABLE]
         
     }
 
@@ -128,6 +129,73 @@ var _command: CDVInvokedUrlCommand!
             return vision?.cloudTextRecognizer() ?? Vision.vision().cloudTextRecognizer()
         }
     }
+
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    //                              Label Identification                            //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    
+    @objc(getLabel:)
+    func getLabel(command: CDVInvokedUrlCommand){
+        options = [String:Any]()
+        action = Actions.GETLABLE
+        _command=command
+        
+        //options = (command.argument(at: 0, withDefault:["no":"no"]) as! [String:Any])
+        
+        let takePicture = command.argument(at: 0, withDefault: false) as! Bool
+        
+        options!["Cloud"] = (command.argument(at: 1, withDefault:false) as! Bool)
+        vision = Vision.vision()
+        if takePicture{
+            commandDelegate.run(inBackground: {
+                self.useCamera()
+            })
+        }else{
+            commandDelegate.run(inBackground: {
+                self.useCameraRoll()
+            })
+        }
+    }
+
+
+    func runLabelIdentifier(for image:VisionImage,onCloud cloud:Bool,call command:CDVInvokedUrlCommand){
+        if cloud {
+            let labelDetector = vision?.cloudImageLabeler() ?? Vision.vision().cloudImageLabeler()
+            labelDetector.process(image, completion: lableResponseHandler)
+        }else{
+            let labelDetector = vision?.onDeviceImageLabeler() ?? Vision.vision().onDeviceImageLabeler()
+            labelDetector.process(image, completion: lableResponseHandler)
+        }
+        
+    }
+    
+    func lableResponseHandler(result:[VisionImageLabel]?,error:Error?){
+        guard error == nil, let result:[VisionImageLabel] = result else{
+            let errorString = error?.localizedDescription ?? "No Result"
+            self.sendPluginError(message: errorString, call: _command)
+            return
+        }
+        var json:[[String:Any]] = Array(repeating: ["test":"test"], count: result.count)
+        var idxLabel = 0
+        for label in result {
+            self.logDebug(message: label.text)
+            
+            var oLabel = [String:Any]()
+            
+            oLabel["label"] = label.text
+            oLabel["confidence"] = label.confidence
+            oLabel["entityID"] = label.entityID
+            
+            json[idxLabel] = oLabel
+            idxLabel = idxLabel + 1
+        }
+        
+        self.sendPluginResult(message: json, call: _command)
+    }
     
     
     // //////////////////////////////////////////////////////////////////////////// //
@@ -189,14 +257,7 @@ var _command: CDVInvokedUrlCommand!
         if mediaType.isEqual(to: kUTTypeImage as String) {
             let image = info[UIImagePickerControllerOriginalImage]
                 as! UIImage
-            
-            let visionImage = VisionImage.init(image: image)
-            switch action {
-            case .GETTEXT:
-                runTextRecognition(for: visionImage, onCloud: options!["Cloud"] as! Bool , in: options!["language"] as! String, call: _command)
-            default:
-                sendPluginError(message: "Invalid Action detected after image selection!", call: _command)
-            }
+            callMlKitImage(for: image)
         }
     }
     
@@ -219,6 +280,19 @@ var _command: CDVInvokedUrlCommand!
     // //////////////////////////////////////////////////////////////////////////// //
     // //////////////////////////////////////////////////////////////////////////// //
     // //////////////////////////////////////////////////////////////////////////// //
+    
+    func callMlKitImage(for image:UIImage){
+        let visionImage = VisionImage.init(image: image)
+        switch action {
+        case .GETTEXT:
+            runTextRecognition(for: visionImage, onCloud: options!["Cloud"] as! Bool , in: options!["language"] as! String, call: _command)
+        case .GETLABLE:
+            runLabelIdentifier(for: visionImage, onCloud: options!["Cloud"] as! Bool, call: _command)
+        default:
+            sendPluginError(message: "Invalid Action detected after image selection!", call: _command)
+        }
+    }
+    
     
     func pointToJson(for point:VisionPoint ) -> [String:Any] {
         var oPoint = [String:Any]()
