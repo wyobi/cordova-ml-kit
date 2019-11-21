@@ -26,8 +26,6 @@
 
         <source-file src="src/android/mlkitplugin.java" target-dir="src/com/outsystems/mlkitplugin/MlKitPlugin" />
 
-        <framework src="src/android/build.gradle" custom="true" type="gradleReference" />
-
         <config-file parent="/*" target="AndroidManifest.xml">
             <uses-permission android:name="android.permission.CAMERA" />
             <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
@@ -40,6 +38,8 @@
                     android:resource="@layout/fileprovider" />
             </provider>
 		</config-file>
+
+        <source-file src="src/android/fileprovider.xml" target-dir="res/layout"/>
 
     </platform>
 
@@ -74,5 +74,5 @@
             <string>This app requires photo library access to function properly.</string>
         </config-file>
 
-    </platform>>
+    </platform>
 </plugin>
