@@ -49,6 +49,7 @@
         <framework src="com.google.firebase:firebase-ml-vision:20.0.0" />
 		<framework src="com.google.android.gms:play-services-tagmanager:16.0.4" />
 		<framework src="com.google.firebase:firebase-core:16.0.4" />
+        <framework src="com.google.firebase:firebase-ml-vision-image-label-model:17.0.2" />
 
     </platform>
 
@@ -88,9 +89,10 @@
 
         <resource-file src="GoogleService-Info.plist" target="./GoogleService-Info.plist" />
 
-        <framework src="FirebaseMLVision" type="podspec" spec="~>0.13.0"/>
+        <framework src="FirebaseMLVision" type="podspec" spec="~>0.15.0"/>
         <framework src="FirebaseAnalytics" type="podspec" spec="~>5.4.0" />
-        <framework src="FirebaseMLVisionTextModel" type="podspec" spec="~>0.13.0" />
+        <framework src="FirebaseMLVisionTextModel" type="podspec" spec="~>0.15.0" />
+        <framework src="FirebaseMLVisionLabelModel" type="podspec" spec="~>0.15.0" />
 
     </platform>
 </plugin>

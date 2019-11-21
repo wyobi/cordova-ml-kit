@@ -1,6 +1,6 @@
 #import "AppDelegate.h"
 
-@interface AppDelegate (MlFirebasePlugin)
+@interface AppDelegate (MlKitPlugin)
 @property (nonatomic, strong) NSNumber *applicationInBackground;
 
 @end

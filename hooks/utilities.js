@@ -42,7 +42,7 @@ module.exports = {
      * The ID of the plugin; this should match the ID in plugin.xml.
      */
   getPluginId: function () {
-    return "com.outsystems.mlfirebaseplugin";
+    return "com.outsystems.mlkitplugin";
   },
 
   copyKey: function (platform) {
