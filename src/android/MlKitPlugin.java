@@ -145,6 +145,94 @@ public class MlKitPlugin extends CordovaPlugin {
             return INVALID;
         }
     }
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    //                                  Camera                                    //
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+
+    protected void requestPermission(String permission, int requestId) throws Exception {
+        Boolean granted = hasPermission(permission);
+        if (granted) {
+            if (permission.equals(Manifest.permission.CAMERA)) {
+                //take Picture
+            } else if (permission.equals(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                //open Gallery
+            }
+        } else {
+            try {
+                java.lang.reflect.Method method = cordova.getClass().getMethod("requestPermission", org.apache.cordova.CordovaPlugin.class, int.class, java.lang.String.class);
+                method.invoke(cordova, this, requestId, permission);
+            } catch (NoSuchMethodException e) {
+                throw new Exception("requestPermissions() method not found in CordovaInterface implementation of Cordova v" + CordovaWebView.CORDOVA_VERSION);
+            }
+        }
+    }
+
+    protected boolean hasPermission(String permission) throws Exception {
+        boolean hasPermission = true;
+        Method method;
+        try {
+            method = cordova.getClass().getMethod("hasPermission", permission.getClass());
+            Boolean bool = (Boolean) method.invoke(cordova, permission);
+            hasPermission = bool.booleanValue();
+        } catch (NoSuchMethodException e) {
+            Log.w(TAG, "Cordova v" + CordovaWebView.CORDOVA_VERSION + " does not support runtime permissions so defaulting to GRANTED for " + permission);
+        }
+        return hasPermission;
+    }
+
+    protected boolean shouldShowRequestPermissionRationale(Activity activity, String permission) throws Exception {
+        boolean shouldShow;
+        try {
+            java.lang.reflect.Method method = ActivityCompat.class.getMethod("shouldShowRequestPermissionRationale", Activity.class, java.lang.String.class);
+            Boolean bool = (Boolean) method.invoke(null, activity, permission);
+            shouldShow = bool.booleanValue();
+        } catch (NoSuchMethodException e) {
+            throw new Exception("shouldShowRequestPermissionRationale() method not found in ActivityCompat class. Check you have Android Support Library v23+ installed");
+        }
+        return shouldShow;
+    }
+
+    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
+        String sRequestId = String.valueOf(requestCode);
+        Log.v(TAG, "Received result for permissions request id=" + sRequestId);
+        try {
+            for (int i = 0, len = permissions.length; i < len; i++) {
+                String androidPermission = permissions[i];
+                if (grantResults[i] == PackageManager.PERMISSION_DENIED) {
+                    boolean showRationale = shouldShowRequestPermissionRationale(this.cordova.getActivity(), androidPermission);
+                    if (!showRationale) {
+
+                        if (androidPermission.equals(Manifest.permission.CAMERA)) {
+                            _callbackContext.error("Camera Permission not allowed!");
+                        } else if (androidPermission.equals(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                            _callbackContext.error("Storage Permission not allowed!");
+                        }
+                    } else {
+                        if (androidPermission.equals(Manifest.permission.CAMERA)) {
+                            _callbackContext.error("Camera Permission not allowed!");
+                        } else if (androidPermission.equals(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                            _callbackContext.error("Storage Permission not allowed!");
+                        }
+                    }
+                } else {
+                    if (androidPermission.equals(Manifest.permission.CAMERA)) {
+                        //take picture
+                    } else if (androidPermission.equals(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                        //open Gallery
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Exception occurred onRequestPermissionsResult: ".concat(e.getMessage()));
+            _callbackContext.error("Exception occurred onRequestPermissionsResult: ".concat(e.getMessage()));
+        }
+    }
 }
 
 
