@@ -65,14 +65,15 @@ public class MlKitPlugin extends CordovaPlugin {
 
     private Actions myAction;
 
-    private Boolean onCloud;
+    private File tempImage;
 
     public void initialize(CordovaInterface cordova, CordovaWebView webView) {
         super.initialize(cordova, webView);
         context = cordova.getActivity().getApplicationContext();
     }
 
-    public boolean execute(String action, JSONArray args, final CallbackContext callbackContext) throws JSONException {
+    public boolean execute(String action, JSONArray args, final CallbackContext callbackContext)
+            throws JSONException {
         _callbackContext = callbackContext;
         String error = isValidCall(action,args);
         try{
@@ -80,38 +81,61 @@ public class MlKitPlugin extends CordovaPlugin {
                 myAction = Actions.fromString(action);
                 switch(myAction){
                     case GETTEXT:
-                        onCloud = args.optBoolean(1,false);
-                        if (onCloud){
-                            options.put("language",args.optString(2,""));
-                        }
-                        if (args.optBoolean(0,false)) {
+
+                        options = args.getJSONObject(0);
+                        if (options.optBoolean("TakePicture",false)) {
                             try {
                                 requestPermission(Manifest.permission.CAMERA, 1);
                             }catch(Exception e){
-                                callbackContext.error("Exception occurred on requestPermission!\n"+e.getMessage());
+                                callbackContext.error("Exception occurred on requestPermission!\n"
+                                        +e.getMessage());
                             }
                         } else {
                             try {
-                                requestPermission(Manifest.permission.READ_EXTERNAL_STORAGE, 1);
+                                requestPermission(Manifest.permission.READ_EXTERNAL_STORAGE,
+                                        1);
                             }catch(Exception e){
-                                callbackContext.error("Exception occurred on requestPermission!\n"+e.getMessage());
+                                callbackContext.error("Exception occurred on requestPermission!\n"
+                                        +e.getMessage());
+                            }
+                        }
+                        break;
+                    case GETLABLE:
+                        options = args.getJSONObject(0);
+                        if (options.optBoolean("TakePicture",false)) {
+                            try {
+                                requestPermission(Manifest.permission.CAMERA, 1);
+                            }catch(Exception e){
+                                callbackContext.error("Exception occurred on requestPermission!\n"
+                                        +e.getMessage());
+                            }
+                        } else {
+                            try {
+                                requestPermission(Manifest.permission.READ_EXTERNAL_STORAGE,
+                                        1);
+                            }catch(Exception e){
+                                callbackContext.error("Exception occurred on requestPermission!\n"
+                                        +e.getMessage());
                             }
                         }
                         break;
                     case GETFACE:
-                        options = args.getJSONObject(1);
+                        options = args.getJSONObject(0);
 
-                        if (args.optBoolean(0,false)) {
+                        if (options.optBoolean("TakePicture",false)) {
                             try {
                                 requestPermission(Manifest.permission.CAMERA, 1);
                             }catch(Exception e){
-                                callbackContext.error("Exception occurred on requestPermission!\n"+e.getMessage());
+                                callbackContext.error("Exception occurred on requestPermission!\n"
+                                        +e.getMessage());
                             }
                         } else {
                             try {
-                                requestPermission(Manifest.permission.READ_EXTERNAL_STORAGE, 1);
+                                requestPermission(Manifest.permission.READ_EXTERNAL_STORAGE,
+                                        1);
                             }catch(Exception e){
-                                callbackContext.error("Exception occurred on requestPermission!\n"+e.getMessage());
+                                callbackContext.error("Exception occurred on requestPermission!\n"
+                                        +e.getMessage());
                             }
                         }
                         break;
@@ -168,9 +192,11 @@ public class MlKitPlugin extends CordovaPlugin {
 
     enum Actions {
         INVALID("", "Invalid action"),
-        GETTEXT("getText", "Invalid arguments-> takePicture: Bool, onCloud: Bool, language: String"),
+        GETTEXT("getText",
+                "Invalid arguments-> takePicture: Bool, onCloud: Bool, language: String"),
         GETLABLE("getLabel","Invalid arguments-> takePicture: Bool, onCloud: Bool"),
-        GETFACE("getFace","Invalid arguments-> takePicture: Bool, options: JSONObject");
+        GETFACE("getFace",
+                "Invalid arguments-> takePicture: Bool, options: JSONObject");
 
         String name;
         String argsDesc;
@@ -198,16 +224,25 @@ public class MlKitPlugin extends CordovaPlugin {
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
 
-    private void runTextRecognition(final CallbackContext callbackContext, final Bitmap img, final String language, final Boolean onCloud) {
+    private void runTextRecognition(final CallbackContext callbackContext, final Bitmap img,
+                                    final String language, final Boolean onCloud) {
 
         FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(img);
 
         FirebaseVisionTextRecognizer textRecognizer;
 
         if(onCloud) {
-            textRecognizer = this.getTextRecognitionCloud(language);
+            if (!language.isEmpty()) {
+                FirebaseVisionCloudTextRecognizerOptions options =
+                        new FirebaseVisionCloudTextRecognizerOptions.Builder()
+                            .setLanguageHints(Arrays.asList(language)).build();
+
+                textRecognizer= FirebaseVision.getInstance().getCloudTextRecognizer(options);
+            } else {
+                textRecognizer = FirebaseVision.getInstance().getCloudTextRecognizer();
+            }
         } else {
-            textRecognizer = this.getTextRecognitionDevice();
+            textRecognizer = FirebaseVision.getInstance().getOnDeviceTextRecognizer();
         }
 
         textRecognizer.processImage(image).addOnSuccessListener(texts -> {
@@ -256,8 +291,9 @@ public class MlKitPlugin extends CordovaPlugin {
 
     private FirebaseVisionTextRecognizer getTextRecognitionCloud( final String language) {
         if (!language.isEmpty()) {
-            FirebaseVisionCloudTextRecognizerOptions options = new FirebaseVisionCloudTextRecognizerOptions.Builder()
-                    .setLanguageHints(Arrays.asList(language)).build();
+            FirebaseVisionCloudTextRecognizerOptions options =
+                    new FirebaseVisionCloudTextRecognizerOptions.Builder()
+                        .setLanguageHints(Arrays.asList(language)).build();
 
             return FirebaseVision.getInstance()
                     .getCloudTextRecognizer(options);
@@ -275,7 +311,8 @@ public class MlKitPlugin extends CordovaPlugin {
     ////////////////////////////////////////////////////////////////////////////////
 
 
-    private void runLabelRecognition(final CallbackContext callbackContext, Bitmap img,Boolean onCloud) {
+    private void runLabelRecognition(final CallbackContext callbackContext,
+                                     Bitmap img,Boolean onCloud) {
 
         FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(img);
         FirebaseVisionImageLabeler labeler;
@@ -330,7 +367,8 @@ public class MlKitPlugin extends CordovaPlugin {
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
 
-    private void runFaceDetector(final CallbackContext callbackContext,Bitmap img,final FirebaseVisionFaceDetectorOptions faceOptions){
+    private void runFaceDetector(final CallbackContext callbackContext,Bitmap img,
+                                 final FirebaseVisionFaceDetectorOptions faceOptions){
 
         FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(img);
 
@@ -360,28 +398,33 @@ public class MlKitPlugin extends CordovaPlugin {
                                         // Head is tilted sideways rotZ degrees
                                         faceJson.put("RotZ",face.getHeadEulerAngleZ());
 
-                                        // If landmark detection was enabled (mouth, ears, eyes, cheeks, and
-                                        // nose available):
-                                        if (faceOptions.getLandmarkMode() == FirebaseVisionFaceDetectorOptions.ALL_LANDMARKS) {
+                                        // If landmark detection was enabled (mouth, ears, eyes,
+                                        // cheeks, and nose available):
+                                        if (faceOptions.getLandmarkMode() ==
+                                                FirebaseVisionFaceDetectorOptions.ALL_LANDMARKS) {
                                             JSONArray landmarks = new JSONArray();
 
 
-                                            List<Integer> landmarksValues = Arrays.asList(FirebaseVisionFaceLandmark.MOUTH_BOTTOM
-                                                    ,FirebaseVisionFaceLandmark.LEFT_CHEEK
-                                                    ,FirebaseVisionFaceLandmark.LEFT_EAR
-                                                    ,FirebaseVisionFaceLandmark.LEFT_EYE
-                                                    ,FirebaseVisionFaceLandmark.MOUTH_LEFT
-                                                    ,FirebaseVisionFaceLandmark.NOSE_BASE
-                                                    ,FirebaseVisionFaceLandmark.RIGHT_CHEEK
-                                                    ,FirebaseVisionFaceLandmark.RIGHT_EAR
-                                                    ,FirebaseVisionFaceLandmark.RIGHT_EYE
-                                                    ,FirebaseVisionFaceLandmark.MOUTH_RIGHT);
+                                            List<Integer> landmarksValues =
+                                                    Arrays.asList(
+                                                        FirebaseVisionFaceLandmark.MOUTH_BOTTOM
+                                                        ,FirebaseVisionFaceLandmark.LEFT_CHEEK
+                                                        ,FirebaseVisionFaceLandmark.LEFT_EAR
+                                                        ,FirebaseVisionFaceLandmark.LEFT_EYE
+                                                        ,FirebaseVisionFaceLandmark.MOUTH_LEFT
+                                                        ,FirebaseVisionFaceLandmark.NOSE_BASE
+                                                        ,FirebaseVisionFaceLandmark.RIGHT_CHEEK
+                                                        ,FirebaseVisionFaceLandmark.RIGHT_EAR
+                                                        ,FirebaseVisionFaceLandmark.RIGHT_EYE
+                                                        ,FirebaseVisionFaceLandmark.MOUTH_RIGHT);
 
                                             for (int landmarkValue : landmarksValues){
 
-                                                FirebaseVisionFaceLandmark landmark = face.getLandmark(landmarkValue);
+                                                FirebaseVisionFaceLandmark landmark =
+                                                        face.getLandmark(landmarkValue);
                                                 if (landmark != null){
-                                                    JSONObject landmarkJson = faceLandmarkConvertToJson(landmark);
+                                                    JSONObject landmarkJson =
+                                                            faceLandmarkConvertToJson(landmark);
                                                     if (landmarkJson != null){
                                                         landmarks.put(landmarkJson);
                                                     }
@@ -394,11 +437,14 @@ public class MlKitPlugin extends CordovaPlugin {
                                         }
 
                                         // If contour detection was enabled:
-                                        if (faceOptions.getContourMode() == FirebaseVisionFaceDetectorOptions.ALL_CONTOURS){
+                                        if (faceOptions.getContourMode() ==
+                                                FirebaseVisionFaceDetectorOptions.ALL_CONTOURS){
                                             JSONArray contours = new JSONArray();
 
 
-                                            List<Integer> contoursValues = Arrays.asList(FirebaseVisionFaceContour.ALL_POINTS
+                                            List<Integer> contoursValues =
+                                                Arrays.asList(
+                                                    FirebaseVisionFaceContour.ALL_POINTS
                                                     ,FirebaseVisionFaceContour.FACE
                                                     ,FirebaseVisionFaceContour.LEFT_EYEBROW_TOP
                                                     ,FirebaseVisionFaceContour.LEFT_EYEBROW_BOTTOM
@@ -414,9 +460,11 @@ public class MlKitPlugin extends CordovaPlugin {
                                                     ,FirebaseVisionFaceContour.NOSE_BOTTOM);
                                             for (int contourValue : contoursValues){
 
-                                                FirebaseVisionFaceContour contour = face.getContour(contourValue);
+                                                FirebaseVisionFaceContour contour =
+                                                        face.getContour(contourValue);
                                                 if (contour != null){
-                                                    JSONObject contourJson = faceContourConvertToJson(contour);
+                                                    JSONObject contourJson =
+                                                            faceContourConvertToJson(contour);
                                                     if (contourJson != null) {
                                                         contours.put(contourJson);
                                                     }
@@ -466,25 +514,6 @@ public class MlKitPlugin extends CordovaPlugin {
                         });
     }
 
-    private JSONObject faceLandmarkConvertToJson(FirebaseVisionFaceLandmark landmark) throws JSONException {
-        JSONObject landmarkJson = new JSONObject();
-        landmarkJson.put(String.valueOf(landmark.getLandmarkType()),visionPointToJson(landmark.getPosition()));
-        if (landmarkJson.get(String.valueOf(landmark.getLandmarkType())).equals(new JSONObject())){
-            return null;
-        }else{
-            return landmarkJson;
-        }
-    }
-
-    private JSONObject faceContourConvertToJson(FirebaseVisionFaceContour contour) throws JSONException {
-        JSONObject contourJson = new JSONObject();
-        contourJson.put(String.valueOf(contour.getFaceContourType()),visionPointsToJson(contour.getPoints()));
-        if (contourJson.get(String.valueOf(contour.getFaceContourType())).equals(new JSONArray())){
-            return null;
-        }else{
-            return contourJson;
-        }
-    }
 
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
@@ -493,8 +522,6 @@ public class MlKitPlugin extends CordovaPlugin {
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
-
-    private File tempImage;
 
     private void takePicture(){
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
@@ -671,10 +698,10 @@ public class MlKitPlugin extends CordovaPlugin {
     private void callML(Bitmap image){
         switch (myAction){
             case GETTEXT:
-                cordova.getThreadPool().execute(() -> runTextRecognition(_callbackContext, image, options.optString("language",""), onCloud));
+                cordova.getThreadPool().execute(() -> runTextRecognition(_callbackContext, image, options.optString("language",""), options.optBoolean("Cloud",false)));
                 break;
             case GETLABLE:
-                cordova.getThreadPool().execute(() -> runLabelRecognition(_callbackContext, image,onCloud));
+                cordova.getThreadPool().execute(() -> runLabelRecognition(_callbackContext, image,options.optBoolean("Cloud",false)));
                 break;
             case GETFACE:
                 if (options.optBoolean("Tracking",false)){
@@ -702,6 +729,28 @@ public class MlKitPlugin extends CordovaPlugin {
                 break;
         }
     }
+
+
+    private JSONObject faceLandmarkConvertToJson(FirebaseVisionFaceLandmark landmark) throws JSONException {
+        JSONObject landmarkJson = new JSONObject();
+        landmarkJson.put(String.valueOf(landmark.getLandmarkType()),visionPointToJson(landmark.getPosition()));
+        if (landmarkJson.get(String.valueOf(landmark.getLandmarkType())).equals(new JSONObject())){
+            return null;
+        }else{
+            return landmarkJson;
+        }
+    }
+
+    private JSONObject faceContourConvertToJson(FirebaseVisionFaceContour contour) throws JSONException {
+        JSONObject contourJson = new JSONObject();
+        contourJson.put(String.valueOf(contour.getFaceContourType()),visionPointsToJson(contour.getPoints()));
+        if (contourJson.get(String.valueOf(contour.getFaceContourType())).equals(new JSONArray())){
+            return null;
+        }else{
+            return contourJson;
+        }
+    }
+
     private JSONArray visionPointsToJson(List<FirebaseVisionPoint> positions) throws JSONException {
         JSONArray pointsJson = new JSONArray();
         for (FirebaseVisionPoint position : positions){

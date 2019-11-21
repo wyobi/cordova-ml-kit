@@ -45,18 +45,12 @@ var _command: CDVInvokedUrlCommand!
 
     @objc(getText:)
     func getText(command: CDVInvokedUrlCommand){
-        options = [String:Any]()
-        
         action = Actions.GETTEXT
         _command=command
         
-        //options = (command.argument(at: 0, withDefault:["no":"no"]) as! [String:Any])
-        
-        let takePicture = command.argument(at: 0, withDefault: false) as! Bool
-        options!["Cloud"] = (command.argument(at: 1, withDefault:false) as! Bool)
-        options!["language"] = command.argument(at: 2, withDefault: "") as? String
+        options = (command.argument(at: 0, withDefault:[:]) as! [String:Any])
         vision = Vision.vision()
-        if takePicture{
+        if options!["TakePicture"] as? Bool ?? false {
             commandDelegate.run(inBackground: {
                 self.useCamera()
             })
@@ -71,9 +65,15 @@ var _command: CDVInvokedUrlCommand!
         
         var textRecognizer:VisionTextRecognizer;
         if cloud {
-            textRecognizer = getTextRecognitionCloud(in:lang)
+            if lang.count > 0 && lang != "" {
+                let options = VisionCloudTextRecognizerOptions()
+                options.languageHints = [lang]
+                textRecognizer = vision?.cloudTextRecognizer(options: options) ?? Vision.vision().cloudTextRecognizer(options: options)
+            }else{
+                textRecognizer = vision?.cloudTextRecognizer() ?? Vision.vision().cloudTextRecognizer()
+            }
         }else{
-            textRecognizer = getTextRecognitionDevice()
+            textRecognizer = vision?.onDeviceTextRecognizer() ?? Vision.vision().onDeviceTextRecognizer()
         }
         textRecognizer.process(image) {result,error in
             guard error == nil, let result:VisionText = result else{
@@ -116,20 +116,6 @@ var _command: CDVInvokedUrlCommand!
             self.sendPluginResult(message: json, call: command)
         }
     }
-    
-    func getTextRecognitionDevice() -> VisionTextRecognizer{
-        return vision?.onDeviceTextRecognizer() ?? Vision.vision().onDeviceTextRecognizer()
-    }
-    
-    func getTextRecognitionCloud(in lang:String) -> VisionTextRecognizer{
-        if lang.count > 0 && lang != "" {
-            let options = VisionCloudTextRecognizerOptions()
-            options.languageHints = [lang]
-            return vision?.cloudTextRecognizer(options: options) ?? Vision.vision().cloudTextRecognizer(options: options)
-        }else{
-            return vision?.cloudTextRecognizer() ?? Vision.vision().cloudTextRecognizer()
-        }
-    }
 
     // //////////////////////////////////////////////////////////////////////////// //
     // //////////////////////////////////////////////////////////////////////////// //
@@ -145,13 +131,9 @@ var _command: CDVInvokedUrlCommand!
         action = Actions.GETLABLE
         _command=command
         
-        //options = (command.argument(at: 0, withDefault:["no":"no"]) as! [String:Any])
-        
-        let takePicture = command.argument(at: 0, withDefault: false) as! Bool
-        
-        options!["Cloud"] = (command.argument(at: 1, withDefault:false) as! Bool)
+        options = (command.argument(at: 0, withDefault:[:]) as! [String:Any])
         vision = Vision.vision()
-        if takePicture{
+        if options!["TakePicture"] as? Bool ?? false {
             commandDelegate.run(inBackground: {
                 self.useCamera()
             })
@@ -210,12 +192,11 @@ var _command: CDVInvokedUrlCommand!
         //options = [String:Any]()
         action = Actions.GETFACE
         _command=command
-        let takePicture = command.argument(at: 0, withDefault: false) as! Bool
         
-        options = (command.argument(at: 1, withDefault:["no":"no"]) as! [String:Any])
+        options = (command.argument(at: 0, withDefault:[:]) as! [String:Any])
         
         vision = Vision.vision()
-        if takePicture{
+        if options!["TakePicture"] as? Bool ?? false {
             commandDelegate.run(inBackground: {
                 self.useCamera()
             })
@@ -428,10 +409,10 @@ var _command: CDVInvokedUrlCommand!
         let image = info[UIImagePickerControllerOriginalImage as UIImagePickerController.InfoKey]
             as! UIImage
         
-        var info2 = [String : Any]()
-        info2[UIImagePickerControllerMediaType] = mediaType
-        info2[UIImagePickerControllerOriginalImage] = image
-        imagePickerController(picker, didFinishPickingMediaWithInfo: info2)
+        var myInfo = [String : Any]()
+        myInfo[UIImagePickerControllerMediaType] = mediaType
+        myInfo[UIImagePickerControllerOriginalImage] = image
+        imagePickerController(picker, didFinishPickingMediaWithInfo: myInfo)
     }
     
     // //////////////////////////////////////////////////////////////////////////// //
@@ -441,7 +422,29 @@ var _command: CDVInvokedUrlCommand!
     // //////////////////////////////////////////////////////////////////////////// //
     // //////////////////////////////////////////////////////////////////////////// //
     // //////////////////////////////////////////////////////////////////////////// //
-
+    
+    func callMlKitImage(for image:UIImage){
+        let visionImage = VisionImage.init(image: image)
+        switch action {
+        case .GETTEXT:
+            runTextRecognition(for: visionImage, onCloud: options!["Cloud"] as? Bool ?? false , in: options!["language"] as? String ?? "", call: _command)
+        case .GETLABLE:
+            runLabelIdentifier(for: visionImage, onCloud: options!["Cloud"] as? Bool ?? false, call: _command)
+        case .GETFACE:
+            let visionOptions = VisionFaceDetectorOptions()
+            visionOptions.performanceMode = VisionFaceDetectorPerformanceMode.init(rawValue: options?["Performance"] as? UInt ?? 2) ?? VisionFaceDetectorPerformanceMode.accurate
+            visionOptions.landmarkMode = VisionFaceDetectorLandmarkMode.init(rawValue: options?["Landmark"] as? UInt ?? 2) ?? VisionFaceDetectorLandmarkMode.all
+            visionOptions.classificationMode = VisionFaceDetectorClassificationMode.init(rawValue: options?["Classification"] as? UInt ?? 2) ?? VisionFaceDetectorClassificationMode.all
+            visionOptions.contourMode = VisionFaceDetectorContourMode.init(rawValue: options?["Contours"] as? UInt ?? 1) ?? VisionFaceDetectorContourMode.none
+            
+            visionOptions.minFaceSize = CGFloat(options?["MinFaceSize"] as? Float ?? 0.1)
+            
+            runFaceDetection(for: visionImage,with: visionOptions, call:_command)
+        default:
+            sendPluginError(message: "Invalid Action detected after image selection!", call: _command)
+        }
+    }
+    
     func contourToJson (for contour:VisionFaceContour) -> [String:Any]{
         let contourPoints =  pointsToJson(for: contour.points)
         var contourJson = [String:Any]()
@@ -455,19 +458,6 @@ var _command: CDVInvokedUrlCommand!
         landmarkJson[landmark.type.rawValue] = landmarkPoint
         return landmarkJson
     }
-    
-    func callMlKitImage(for image:UIImage){
-        let visionImage = VisionImage.init(image: image)
-        switch action {
-        case .GETTEXT:
-            runTextRecognition(for: visionImage, onCloud: options!["Cloud"] as! Bool , in: options!["language"] as! String, call: _command)
-        case .GETLABLE:
-            runLabelIdentifier(for: visionImage, onCloud: options!["Cloud"] as! Bool, call: _command)
-        default:
-            sendPluginError(message: "Invalid Action detected after image selection!", call: _command)
-        }
-    }
-    
     
     func pointToJson(for point:VisionPoint ) -> [String:Any] {
         var oPoint = [String:Any]()

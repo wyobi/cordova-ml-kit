@@ -1,20 +1,14 @@
 var exec = require('cordova/exec');
 
-exports.getText = function (success, error,takePicture,cloud,lang) {
+exports.getText = function (success, error,options) {
 
-    var args = [takePicture,cloud,lang];
-
-    exec(success, error, 'MlKitPlugin', 'getText', args);
+    exec(success, error, 'MlKitPlugin', 'getText', [options]);
 };
-exports.getLabel = function (success, error,takePicture,cloud) {
+exports.getLabel = function (success, error,options) {
 
-    var args = [takePicture,cloud];
-
-    exec(success, error, 'MlKitPlugin', 'getLabel', args);
+    exec(success, error, 'MlKitPlugin', 'getLabel', [options]);
 };
-exports.getFace = function (success, error,takePicture,options) {
+exports.getFace = function (success, error,options) {
 
-    var args = [takePicture,options];
-
-    exec(success, error, 'MlKitPlugin', 'getFace', args);
+    exec(success, error, 'MlKitPlugin', 'getFace', [options]);
 };
