@@ -12,3 +12,9 @@ exports.getLabel = function (success, error,takePicture,cloud) {
 
     exec(success, error, 'MlKitPlugin', 'getLabel', args);
 };
+exports.getFace = function (success, error,takePicture,options) {
+
+    var args = [takePicture,options];
+
+    exec(success, error, 'MlKitPlugin', 'getFace', args);
+};
