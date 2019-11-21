@@ -70,6 +70,8 @@ import static android.app.Activity.RESULT_OK;
 
 public class MlKitPlugin extends CordovaPlugin {
     private static final String TAG = "MlKitPlugin";
+    private static final int TAKE_PICTURE_REQUEST_CODE = 1;
+    private static final int OPEN_GALLERY_REQUEST_CODE = 2;
 
     private static Context context;
 
@@ -143,6 +145,181 @@ public class MlKitPlugin extends CordovaPlugin {
                 }
             }
             return INVALID;
+        }
+    }
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    //                                  Camera                                    //
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+
+    private File tempImage;
+
+    private void takePicture(){
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        final String file = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/MlKitPhoto.jpg";
+        File newFile = new File(file);
+        try{
+            newFile.createNewFile();
+        }catch(IOException e){
+
+        }
+        tempImage = newFile;
+        Activity act = this.cordova.getActivity();
+        String packagename = act.getComponentName().getPackageName();
+        Uri imageUri = FileProvider.getUriForFile(
+                act.getApplicationContext(),
+                packagename,
+                tempImage);
+        takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT,imageUri);
+
+        if (this.cordova != null) {
+            PackageManager mPm = act.getPackageManager();
+            if(takePictureIntent.resolveActivity(mPm) != null)
+            {
+                this.cordova.startActivityForResult((CordovaPlugin) this, takePictureIntent, TAKE_PICTURE_REQUEST_CODE);
+            }
+            else
+            {
+                Log.d(TAG, "Error: You don't have a default camera.  Your device may not be CTS complaint.");
+            }
+        }
+    }
+
+    private void openPhotoLibrary(){
+        Intent PictureIntent = new Intent(Intent.ACTION_PICK,MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+
+        if (this.cordova != null) {
+            // Let's check to make sure the camera is actually installed. (Legacy Nexus 7 code)
+            PackageManager mPm = this.cordova.getActivity().getPackageManager();
+            if (PictureIntent.resolveActivity(mPm) != null) {
+                this.cordova.startActivityForResult((CordovaPlugin) this, PictureIntent, OPEN_GALLERY_REQUEST_CODE);
+            } else {
+                Log.d(TAG, "Error: You don't have a default camera.  Your device may not be CTS complaint.");
+            }
+        }
+    }
+
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode,resultCode,data);
+        if (resultCode == RESULT_OK){
+            if (requestCode == TAKE_PICTURE_REQUEST_CODE) {
+                //Bundle extras = data.getExtras();
+                //Bitmap imageBitmap = (Bitmap) extras.get("data");
+                try{
+                    Activity act = this.cordova.getActivity();
+                    String packagename = act.getComponentName().getPackageName();
+                    Uri imageUri = FileProvider.getUriForFile(
+                            act,
+                            packagename, //(use your app signature + ".provider" )
+                            tempImage);
+                    final Bitmap imageBitmap = MediaStore.Images.Media.getBitmap(cordova.getActivity().getContentResolver(),imageUri);
+
+                    //call text identification, label recognition, face detection
+
+                    return;
+                }catch (IOException e){
+                    _callbackContext.error("Could not retrieve image!");
+                    return;
+                }
+            }else if (requestCode == OPEN_GALLERY_REQUEST_CODE){
+                Uri selectedImage = data.getData();
+                try{
+                    final Bitmap imageBitmap = MediaStore.Images.Media.getBitmap(cordova.getActivity().getContentResolver(),selectedImage);
+                    //call text identification, label recognition, face detection
+
+                    return;
+                }catch (IOException e){
+                    _callbackContext.error("Could not retrieve image!");
+                    return;
+                }
+            }
+        }
+        _callbackContext.error("No Image Selected!");
+
+
+    }
+
+    protected void requestPermission(String permission, int requestId) throws Exception {
+        Boolean granted = hasPermission(permission);
+        if (granted) {
+            if (permission.equals(Manifest.permission.CAMERA)) {
+                takePicture();
+            } else if (permission.equals(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                openPhotoLibrary();
+            }
+        } else {
+            try {
+                java.lang.reflect.Method method = cordova.getClass().getMethod("requestPermission", org.apache.cordova.CordovaPlugin.class, int.class, java.lang.String.class);
+                method.invoke(cordova, this, requestId, permission);
+            } catch (NoSuchMethodException e) {
+                throw new Exception("requestPermissions() method not found in CordovaInterface implementation of Cordova v" + CordovaWebView.CORDOVA_VERSION);
+            }
+        }
+    }
+
+    protected boolean hasPermission(String permission) throws Exception {
+        boolean hasPermission = true;
+        Method method;
+        try {
+            method = cordova.getClass().getMethod("hasPermission", permission.getClass());
+            Boolean bool = (Boolean) method.invoke(cordova, permission);
+            hasPermission = bool.booleanValue();
+        } catch (NoSuchMethodException e) {
+            Log.w(TAG, "Cordova v" + CordovaWebView.CORDOVA_VERSION + " does not support runtime permissions so defaulting to GRANTED for " + permission);
+        }
+        return hasPermission;
+    }
+
+    protected boolean shouldShowRequestPermissionRationale(Activity activity, String permission) throws Exception {
+        boolean shouldShow;
+        try {
+            java.lang.reflect.Method method = ActivityCompat.class.getMethod("shouldShowRequestPermissionRationale", Activity.class, java.lang.String.class);
+            Boolean bool = (Boolean) method.invoke(null, activity, permission);
+            shouldShow = bool.booleanValue();
+        } catch (NoSuchMethodException e) {
+            throw new Exception("shouldShowRequestPermissionRationale() method not found in ActivityCompat class. Check you have Android Support Library v23+ installed");
+        }
+        return shouldShow;
+    }
+
+    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
+        String sRequestId = String.valueOf(requestCode);
+        Log.v(TAG, "Received result for permissions request id=" + sRequestId);
+        try {
+            for (int i = 0, len = permissions.length; i < len; i++) {
+                String androidPermission = permissions[i];
+                if (grantResults[i] == PackageManager.PERMISSION_DENIED) {
+                    boolean showRationale = shouldShowRequestPermissionRationale(this.cordova.getActivity(), androidPermission);
+                    if (!showRationale) {
+
+                        if (androidPermission.equals(Manifest.permission.CAMERA)) {
+                            _callbackContext.error("Camera Permission not allowed!");
+                        } else if (androidPermission.equals(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                            _callbackContext.error("Storage Permission not allowed!");
+                        }
+                    } else {
+                        if (androidPermission.equals(Manifest.permission.CAMERA)) {
+                            _callbackContext.error("Camera Permission not allowed!");
+                        } else if (androidPermission.equals(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                            _callbackContext.error("Storage Permission not allowed!");
+                        }
+                    }
+                } else {
+                    if (androidPermission.equals(Manifest.permission.CAMERA)) {
+                        takePicture();
+                    } else if (androidPermission.equals(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                        openPhotoLibrary();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Exception occurred onRequestPermissionsResult: ".concat(e.getMessage()));
+            _callbackContext.error("Exception occurred onRequestPermissionsResult: ".concat(e.getMessage()));
         }
     }
 }

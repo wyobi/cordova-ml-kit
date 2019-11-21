@@ -28,6 +28,19 @@
 
         <framework src="src/android/build.gradle" custom="true" type="gradleReference" />
 
+        <config-file parent="/*" target="AndroidManifest.xml">
+            <uses-permission android:name="android.permission.CAMERA" />
+            <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+            <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+        </config-file>
+        <config-file target="AndroidManifest.xml" parent="/manifest/application">
+			<provider android:grantUriPermissions="true" android:exported="false" android:name="android.support.v4.content.FileProvider" android:authorities="${applicationId}" >
+                <meta-data
+                    android:name="android.support.FILE_PROVIDER_PATHS"
+                    android:resource="@layout/fileprovider" />
+            </provider>
+		</config-file>
+
     </platform>
 
 
@@ -48,6 +61,18 @@
 
         <header-file src="src/ios/MlKitPluginBridging-Header.h" type="BridgingHeader"/>
         <source-file src="src/ios/MlKitPlugin.swift" />
+
+
+        <framework src="MobileCoreServices.framework" />
+        <framework src="AVFoundation.framework" />
+
+        <config-file target="*-Info.plist" parent="NSCameraUsageDescription">
+            <string>This app requires camera access to function properly.</string>
+        </config-file>
+
+        <config-file target="*-Info.plist" parent="NSPhotoLibraryUsageDescription">
+            <string>This app requires photo library access to function properly.</string>
+        </config-file>
 
     </platform>>
 </plugin>
