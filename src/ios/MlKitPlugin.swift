@@ -8,9 +8,13 @@ import AVFoundation
 
 import MobileCoreServices
 
+import FirebaseMLVision
+
+import FirebaseMLCommon
+
 var _command: CDVInvokedUrlCommand!
 
-@objc(MlKitPlugin) class MlKitPlugin : CDVPlugin{
+@objc(MlKitPlugin) class MlKitPlugin : CDVPlugin,UIImagePickerControllerDelegate,UINavigationControllerDelegate{
     
     static let LOG_TAG = "ML-Kit-Plugin";
     
@@ -18,32 +22,121 @@ var _command: CDVInvokedUrlCommand!
     
     var options:[String:Any]?
 
+    var vision:Vision?
+
     enum Actions {
         case INVALID
-        case COOLMETHOD
+        case GETTEXT
         
-        static let allValues = [INVALID,COOLMETHOD]
+        static let allValues = [INVALID,GETTEXT]
         
     }
-    
-    @objc(coolMethod:)
-    func coolMethod(command: CDVInvokedUrlCommand){
+
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    //                                Text Recognition                              //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+
+
+    @objc(getText:)
+    func getText(command: CDVInvokedUrlCommand){
         options = [String:Any]()
         
-        action = Actions.COOLMETHOD
+        action = Actions.GETTEXT
         _command=command
+        
+        //options = (command.argument(at: 0, withDefault:["no":"no"]) as! [String:Any])
+        
+        let takePicture = command.argument(at: 0, withDefault: false) as! Bool
+        options!["Cloud"] = (command.argument(at: 1, withDefault:false) as! Bool)
+        options!["language"] = command.argument(at: 2, withDefault: "") as? String
+        vision = Vision.vision()
+        if takePicture{
+            commandDelegate.run(inBackground: {
+                self.useCamera()
+            })
+        }else{
+            commandDelegate.run(inBackground: {
+                self.useCameraRoll()
+            })
+        }
+    }
 
-        options = (command.argument(at: 0, withDefault:["no":"no"]) as! [String:Any])
+    func runTextRecognition(for image:VisionImage,onCloud cloud:Bool,in lang:String,call command:CDVInvokedUrlCommand) {
+        
+        var textRecognizer:VisionTextRecognizer;
+        if cloud {
+            textRecognizer = getTextRecognitionCloud(in:lang)
+        }else{
+            textRecognizer = getTextRecognitionDevice()
+        }
+        textRecognizer.process(image) {result,error in
+            guard error == nil, let result:VisionText = result else{
+                let errorString = error?.localizedDescription ?? "No Result"
+                self.sendPluginError(message: errorString, call: command)
+                return
+            }
+            var json = [String:Any]()
+            var blocks:[[String:Any]] = Array(repeating: ["test":"test"], count: result.blocks.count)
+            
+            var idxBlock = 0
+            for block:VisionTextBlock in result.blocks {
+                self.logDebug(message: block.text)
+                
+                var oBlock = [String:Any]()
+                var lines:[[String:Any]] = Array(repeating: ["test":"test"], count: block.lines.count)
+                var idxLine = 0
+                
+                for line:VisionTextLine in block.lines {
+                    var oLine = [String:Any]()
+                    oLine["text"] = line.text
+                    oLine["confidence"] = line.confidence
+                    oLine["boundingBox"] = self.rectToJson(for: line.frame)
+                    oLine["cornerPoints"] = self.pointsToJson(for: line.cornerPoints ?? [NSValue]())
+                    lines[idxLine] = oLine
+                    idxLine = idxLine + 1
+                }
+                
+                oBlock["text"] = block.text
+                oBlock["confidence"] = block.confidence
+                oBlock["boundingBox"] = self.rectToJson(for: block.frame)
+                oBlock["cornerPoints"] = self.pointsToJson(for: block.cornerPoints ?? [NSValue]())
+                oBlock["lines"] = block.text
+                blocks[idxBlock] = oBlock
+                idxBlock = idxBlock + 1
+            }
+            json["text"] = result.text
+            json["textBlocks"] = blocks
+            
+            self.sendPluginResult(message: json, call: command)
+        }
+    }
+    
+    func getTextRecognitionDevice() -> VisionTextRecognizer{
+        return vision?.onDeviceTextRecognizer() ?? Vision.vision().onDeviceTextRecognizer()
+    }
+    
+    func getTextRecognitionCloud(in lang:String) -> VisionTextRecognizer{
+        if lang.count > 0 && lang != "" {
+            let options = VisionCloudTextRecognizerOptions()
+            options.languageHints = [lang]
+            return vision?.cloudTextRecognizer(options: options) ?? Vision.vision().cloudTextRecognizer(options: options)
+        }else{
+            return vision?.cloudTextRecognizer() ?? Vision.vision().cloudTextRecognizer()
+        }
     }
     
     
-    ////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////
-    //                                  Camera                                    //
-    ////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    //                                   Camera                                     //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
 
     func useCamera() {
         
@@ -97,25 +190,10 @@ var _command: CDVInvokedUrlCommand!
             let image = info[UIImagePickerControllerOriginalImage]
                 as! UIImage
             
-            let visionImage = getVisionImage(in: image)
+            let visionImage = VisionImage.init(image: image)
             switch action {
             case .GETTEXT:
                 runTextRecognition(for: visionImage, onCloud: options!["Cloud"] as! Bool , in: options!["language"] as! String, call: _command)
-            case .GETLABLE:
-                runLabelIdentifier(for: visionImage, onCloud: options!["Cloud"] as! Bool, call: _command)
-            case .GETFACE:
-                let visionOptions = VisionFaceDetectorOptions()
-                visionOptions.performanceMode = VisionFaceDetectorPerformanceMode.init(rawValue: options?["Performance"] as? UInt ?? 2) ?? VisionFaceDetectorPerformanceMode.accurate
-                visionOptions.landmarkMode = VisionFaceDetectorLandmarkMode.init(rawValue: options?["Landmark"] as? UInt ?? 2) ?? VisionFaceDetectorLandmarkMode.all
-                visionOptions.classificationMode = VisionFaceDetectorClassificationMode.init(rawValue: options?["Classification"] as? UInt ?? 2) ?? VisionFaceDetectorClassificationMode.all
-                visionOptions.contourMode = VisionFaceDetectorContourMode.init(rawValue: options?["Contours"] as? UInt ?? 1) ?? VisionFaceDetectorContourMode.none
-                
-                visionOptions.minFaceSize = CGFloat(options?["MinFaceSize"] as? Float ?? 0.1)
-                
-                options?["Tracking"] as? Bool ?? false
-                
-                
-                runFaceDetection(for: visionImage,with: visionOptions, call:_command)
             default:
                 sendPluginError(message: "Invalid Action detected after image selection!", call: _command)
             }
@@ -134,13 +212,63 @@ var _command: CDVInvokedUrlCommand!
         imagePickerController(picker, didFinishPickingMediaWithInfo: info2)
     }
     
-    ////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////
-    //                                 Utilities                                  //
-    ////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    //                                  Utilities                                   //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    
+    func pointToJson(for point:VisionPoint ) -> [String:Any] {
+        var oPoint = [String:Any]()
+        oPoint["x"] = point.x
+        oPoint["y"] = point.y
+        oPoint["z"] = point.z
+        return oPoint
+    }
+    
+    func pointsToJson(for points:[VisionPoint] ) -> Array<Any> {
+        var aPoints:[[String:Any]] = Array(repeating: ["test":"test"], count: points.count)
+        
+        for point:VisionPoint in points{
+            
+            let aPoint = pointToJson(for: point)
+            aPoints.append(aPoint)
+        }
+        return aPoints
+    }
+    
+    func rectToJson(for rec:CGRect ) -> [String:Any] {
+        var oBoundBox = [String:Any]()
+        oBoundBox["left"] = rec.minX
+        oBoundBox["right"] = rec.maxX
+        oBoundBox["top"] = rec.maxY
+        oBoundBox["bottom"] = rec.minY
+        return oBoundBox
+    }
+    
+    func pointsToJson(for points: [NSValue]) -> Array<Any> {
+        var aPoints:[[String:Any]] = Array(repeating: ["test":"test"], count: points.count)
+        var idxPoint = 0
+        
+        for point:NSValue in points{
+            
+            let aPoint = pointToJson(for: point)
+            
+            aPoints[idxPoint] = aPoint
+            idxPoint = idxPoint + 1
+        }
+        return aPoints
+    }
+    
+    func pointToJson(for point: NSValue) -> [String:Any] {
+        var aPoint = [String:Any]()
+        aPoint["x"] = point.cgPointValue.x
+        aPoint["y"] = point.cgPointValue.y
+        
+        return aPoint
+    }
     
     func convertToJson(in json:[String:Any])->String{
         var finalString = "{"
@@ -228,15 +356,15 @@ var _command: CDVInvokedUrlCommand!
     
     func logDebug(message msg:String)
     {
-        NSLog("%@: %@", MlFirebasePlugin.LOG_TAG, msg);
-        let jsString = "console.log(\""+MlFirebasePlugin.LOG_TAG+": "+escapeDoubleQuotes(str: msg)+"\")";
+        NSLog("%@: %@", MlKitPlugin.LOG_TAG, msg);
+        let jsString = "console.log(\""+MlKitPlugin.LOG_TAG+": "+escapeDoubleQuotes(str: msg)+"\")";
         executeGlobalJavascript(withScript: jsString);
     }
     
     func logError(message msg:String)
     {
-        NSLog("%@ ERROR: %@", MlFirebasePlugin.LOG_TAG, msg);
-        let jsString = "console.error(\""+MlFirebasePlugin.LOG_TAG+": "+escapeDoubleQuotes(str: msg)+"\")";
+        NSLog("%@ ERROR: %@", MlKitPlugin.LOG_TAG, msg);
+        let jsString = "console.error(\""+MlKitPlugin.LOG_TAG+": "+escapeDoubleQuotes(str: msg)+"\")";
         executeGlobalJavascript(withScript: jsString);
     }
     

@@ -1,5 +1,8 @@
 var exec = require('cordova/exec');
 
-exports.coolMethod = function (arg0, success, error) {
-    exec(success, error, 'MlKitPlugin', 'coolMethod', [arg0]);
+exports.getText = function (success, error,takePicture,cloud,lang) {
+
+    var args = [takePicture,cloud,lang];
+
+    exec(success, error, 'MlKitPlugin', 'getText', args);
 };

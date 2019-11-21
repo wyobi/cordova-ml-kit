@@ -41,6 +41,15 @@
 
         <source-file src="src/android/fileprovider.xml" target-dir="res/layout"/>
 
+        <framework src="src/android/build.gradle" custom="true" type="gradleReference" />
+
+        <resource-file src="google-services.json" target="./google-services.json" />
+
+        <framework src="com.android.support:support-v4:27.+"/>
+        <framework src="com.google.firebase:firebase-ml-vision:20.0.0" />
+		<framework src="com.google.android.gms:play-services-tagmanager:16.0.4" />
+		<framework src="com.google.firebase:firebase-core:16.0.4" />
+
     </platform>
 
 
@@ -73,6 +82,15 @@
         <config-file target="*-Info.plist" parent="NSPhotoLibraryUsageDescription">
             <string>This app requires photo library access to function properly.</string>
         </config-file>
+
+        <header-file src="src/ios/AppDelegate+MLPlugin.h" />
+		<source-file src="src/ios/AppDelegate+MLPlugin.m" />
+
+        <resource-file src="GoogleService-Info.plist" target="./GoogleService-Info.plist" />
+
+        <framework src="FirebaseMLVision" type="podspec" spec="~>0.13.0"/>
+        <framework src="FirebaseAnalytics" type="podspec" spec="~>5.4.0" />
+        <framework src="FirebaseMLVisionTextModel" type="podspec" spec="~>0.13.0" />
 
     </platform>
 </plugin>
