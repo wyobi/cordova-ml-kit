@@ -24,8 +24,8 @@ function addDependencies(buildGradle) {
   var whitespace = match[1];
   
   // modify the line to add the necessary dependencies
-  var googlePlayDependency = whitespace + 'classpath \'com.google.gms:google-services:4.2.0\' // google-services dependency from com.outsystems.mlfirebaseplugin';
-  var fabricDependency = whitespace + 'classpath \'io.fabric.tools:gradle:1.25.4\' // fabric dependency from com.outsystems.mlfirebaseplugin'
+  var googlePlayDependency = whitespace + 'classpath \'com.google.gms:google-services:4.2.0\' // google-services dependency from com.outsystems.mlkitplugin';
+  var fabricDependency = whitespace + 'classpath \'io.fabric.tools:gradle:1.25.4\' // fabric dependency from com.outsystems.mlkitplugin'
   var modifiedLine = match[0] + '\n' + googlePlayDependency + '\n' + fabricDependency;
   
   // modify the actual line
@@ -42,7 +42,7 @@ function addRepos(buildGradle) {
 
   // modify the line to add the necessary repo
   // Crashlytics goes under buildscripts which is the first grouping in the file
-  var fabricMavenRepo = whitespace + 'maven { url \'https://maven.fabric.io/public\' } // Fabrics Maven repository from com.outsystems.mlfirebaseplugin'
+  var fabricMavenRepo = whitespace + 'maven { url \'https://maven.fabric.io/public\' } // Fabrics Maven repository from com.outsystems.mlkitplugin'
   var modifiedLine = match[0] + '\n' + fabricMavenRepo;
 
   // modify the actual line
@@ -57,7 +57,7 @@ function addRepos(buildGradle) {
 
     // Add google() to the allprojects section of the string
     match = secondHalfOfFile.match(/^(\s*)jcenter\(\)/m);
-    var googlesMavenRepo = whitespace + 'google() // Google\'s Maven repository from com.outsystems.mlfirebaseplugin';
+    var googlesMavenRepo = whitespace + 'google() // Google\'s Maven repository from com.outsystems.mlkitplugin';
     modifiedLine = match[0] + '\n' + googlesMavenRepo;
     // modify the part of the string that is after 'allprojects'
     secondHalfOfFile = secondHalfOfFile.replace(/^(\s*)jcenter\(\)/m, modifiedLine);
@@ -67,7 +67,7 @@ function addRepos(buildGradle) {
   } else {
     // this should not happen, but if it does, we should try to add the dependency to the buildscript
     match = buildGradle.match(/^(\s*)jcenter\(\)/m);
-    var googlesMavenRepo = whitespace + 'google() // Google\'s Maven repository from com.outsystems.mlfirebaseplugin';
+    var googlesMavenRepo = whitespace + 'google() // Google\'s Maven repository from com.outsystems.mlkitplugin';
     modifiedLine = match[0] + '\n' + googlesMavenRepo;
     // modify the part of the string that is after 'allprojects'
     buildGradle = buildGradle.replace(/^(\s*)jcenter\(\)/m, modifiedLine);
@@ -94,10 +94,10 @@ function readFile(targetPath){
 
 function readGoogleServicesJson(isAppOne){
   if(isAppOne){
-    var target = path.join("platforms","android","app","src","main","java","com","outsystems","MlFirebasePlugin", "google-services.json");
+    var target = path.join("platforms","android","app","src","main","java","com","outsystems","MlKitPlugin", "google-services.json");
     return readFile(target);
   }else{
-    var target = path.join("platforms","android","app","src","main","java","com","outsystems","MlFirebasePlugin", "google-services.json");
+    var target = path.join("platforms","android","app","src","main","java","com","outsystems","MlKitPlugin", "google-services.json");
     return readFile(target);
   }
 }
@@ -130,7 +130,7 @@ module.exports = {
     var buildGradle = readRootBuildGradle();
 
     // remove any lines we added
-    buildGradle = buildGradle.replace(/(?:^|\r?\n)(.*)com\.outsystems\.mlfirebaseplugin*?(?=$|\r?\n)/g, '');
+    buildGradle = buildGradle.replace(/(?:^|\r?\n)(.*)com\.outsystems\.mlkitplugin*?(?=$|\r?\n)/g, '');
   
     writeRootBuildGradle(buildGradle);
   },

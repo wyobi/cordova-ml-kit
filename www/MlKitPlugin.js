@@ -1,5 +1,14 @@
 var exec = require('cordova/exec');
 
-exports.coolMethod = function (arg0, success, error) {
-    exec(success, error, 'MlKitPlugin', 'coolMethod', [arg0]);
+exports.getText = function (success, error,options) {
+
+    exec(success, error, 'MlKitPlugin', 'getText', [options]);
+};
+exports.getLabel = function (success, error,options) {
+
+    exec(success, error, 'MlKitPlugin', 'getLabel', [options]);
+};
+exports.getFace = function (success, error,options) {
+
+    exec(success, error, 'MlKitPlugin', 'getFace', [options]);
 };
