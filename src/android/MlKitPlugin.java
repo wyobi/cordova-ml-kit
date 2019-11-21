@@ -114,6 +114,23 @@ public class MlKitPlugin extends CordovaPlugin {
                             }
                         }
                         break;
+                    case GETFACE:
+                        options = args.getJSONObject(1);
+
+                        if (args.optBoolean(0,false)) {
+                            try {
+                                requestPermission(Manifest.permission.CAMERA, 1);
+                            }catch(Exception e){
+                                callbackContext.error("Exception occurred on requestPermission!\n"+e.getMessage());
+                            }
+                        } else {
+                            try {
+                                requestPermission(Manifest.permission.READ_EXTERNAL_STORAGE, 1);
+                            }catch(Exception e){
+                                callbackContext.error("Exception occurred on requestPermission!\n"+e.getMessage());
+                            }
+                        }
+                        break;
                 }
                 return true;
             }else{
@@ -142,6 +159,15 @@ public class MlKitPlugin extends CordovaPlugin {
                     isValid = false;
                 }
                 return isValid ? "" : a.argsDesc;
+            case GETFACE:
+                isValid = args.length() == 2;
+                try {
+                    args.getBoolean(0);
+                    args.getJSONObject(1);
+                } catch (JSONException e) {
+                    isValid = false;
+                }
+                return isValid ? "" : a.argsDesc;
             default:
                 return Actions.INVALID.argsDesc;
         }
@@ -149,7 +175,8 @@ public class MlKitPlugin extends CordovaPlugin {
 
     enum Actions {
         INVALID("", "Invalid action"),
-        GETTEXT("getText", "Invalid arguments-> takePicture: Bool, onCloud: Bool, language: String"),;
+        GETTEXT("getText", "Invalid arguments-> takePicture: Bool, onCloud: Bool, language: String"),
+        GETFACE("getFace","Invalid arguments-> takePicture: Bool, options: JSONObject");
 
         String name;
         String argsDesc;
@@ -245,6 +272,170 @@ public class MlKitPlugin extends CordovaPlugin {
         }
     }
 
+
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    //                              Face Detection                                //
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+
+    private void runFaceDetector(final CallbackContext callbackContext,Bitmap img,final FirebaseVisionFaceDetectorOptions faceOptions){
+
+        FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(img);
+
+        FirebaseVisionFaceDetector detector = FirebaseVision.getInstance()
+                .getVisionFaceDetector(faceOptions);
+
+        detector.detectInImage(image)
+                .addOnSuccessListener(
+                        new OnSuccessListener<List<FirebaseVisionFace>>() {
+                            @Override
+                            public void onSuccess(List<FirebaseVisionFace> faces) {
+                                // Task completed successfully
+                                // ...
+
+                                JSONArray json = new JSONArray();
+
+                                for (FirebaseVisionFace face : faces) {
+                                    try {
+                                        JSONObject faceJson = new JSONObject();
+
+                                        Rect bounds = face.getBoundingBox();
+
+                                        faceJson.put("Bounds", rectToJson(bounds));
+
+                                        // Head is rotated to the right rotY degrees
+                                        faceJson.put("RotY",face.getHeadEulerAngleY());
+                                        // Head is tilted sideways rotZ degrees
+                                        faceJson.put("RotZ",face.getHeadEulerAngleZ());
+
+                                        // If landmark detection was enabled (mouth, ears, eyes, cheeks, and
+                                        // nose available):
+                                        if (faceOptions.getLandmarkMode() == FirebaseVisionFaceDetectorOptions.ALL_LANDMARKS) {
+                                            JSONArray landmarks = new JSONArray();
+
+
+                                            List<Integer> landmarksValues = Arrays.asList(FirebaseVisionFaceLandmark.MOUTH_BOTTOM
+                                                    ,FirebaseVisionFaceLandmark.LEFT_CHEEK
+                                                    ,FirebaseVisionFaceLandmark.LEFT_EAR
+                                                    ,FirebaseVisionFaceLandmark.LEFT_EYE
+                                                    ,FirebaseVisionFaceLandmark.MOUTH_LEFT
+                                                    ,FirebaseVisionFaceLandmark.NOSE_BASE
+                                                    ,FirebaseVisionFaceLandmark.RIGHT_CHEEK
+                                                    ,FirebaseVisionFaceLandmark.RIGHT_EAR
+                                                    ,FirebaseVisionFaceLandmark.RIGHT_EYE
+                                                    ,FirebaseVisionFaceLandmark.MOUTH_RIGHT);
+
+                                            for (int landmarkValue : landmarksValues){
+
+                                                FirebaseVisionFaceLandmark landmark = face.getLandmark(landmarkValue);
+                                                if (landmark != null){
+                                                    JSONObject landmarkJson = faceLandmarkConvertToJson(landmark);
+                                                    if (landmarkJson != null){
+                                                        landmarks.put(landmarkJson);
+                                                    }
+                                                }
+                                            }
+
+                                            if (!landmarks.equals(new JSONArray())){
+                                                faceJson.put("Landmarks",landmarks);
+                                            }
+                                        }
+
+                                        // If contour detection was enabled:
+                                        if (faceOptions.getContourMode() == FirebaseVisionFaceDetectorOptions.ALL_CONTOURS){
+                                            JSONArray contours = new JSONArray();
+
+
+                                            List<Integer> contoursValues = Arrays.asList(FirebaseVisionFaceContour.ALL_POINTS
+                                                    ,FirebaseVisionFaceContour.FACE
+                                                    ,FirebaseVisionFaceContour.LEFT_EYEBROW_TOP
+                                                    ,FirebaseVisionFaceContour.LEFT_EYEBROW_BOTTOM
+                                                    ,FirebaseVisionFaceContour.RIGHT_EYEBROW_TOP
+                                                    ,FirebaseVisionFaceContour.RIGHT_EYEBROW_BOTTOM
+                                                    ,FirebaseVisionFaceContour.LEFT_EYE
+                                                    ,FirebaseVisionFaceContour.RIGHT_EYE
+                                                    ,FirebaseVisionFaceContour.UPPER_LIP_TOP
+                                                    ,FirebaseVisionFaceContour.UPPER_LIP_BOTTOM
+                                                    ,FirebaseVisionFaceContour.LOWER_LIP_TOP
+                                                    ,FirebaseVisionFaceContour.LOWER_LIP_BOTTOM
+                                                    ,FirebaseVisionFaceContour.NOSE_BRIDGE
+                                                    ,FirebaseVisionFaceContour.NOSE_BOTTOM);
+                                            for (int contourValue : contoursValues){
+
+                                                FirebaseVisionFaceContour contour = face.getContour(contourValue);
+                                                if (contour != null){
+                                                    JSONObject contourJson = faceContourConvertToJson(contour);
+                                                    if (contourJson != null) {
+                                                        contours.put(contourJson);
+                                                    }
+                                                }
+                                            }
+                                            if (!contours.equals(new JSONArray())){
+                                                faceJson.put("Contours",contours);
+                                            }
+                                        }
+
+                                        // If classification was enabled:
+                                        if (faceOptions.getClassificationMode() == FirebaseVisionFaceDetectorOptions.ALL_CLASSIFICATIONS){
+                                            JSONObject classification = new JSONObject();
+                                            if (face.getSmilingProbability() != FirebaseVisionFace.UNCOMPUTED_PROBABILITY) {
+                                                classification.put("SmileProbability",face.getSmilingProbability());
+                                            }
+                                            if (face.getLeftEyeOpenProbability() != FirebaseVisionFace.UNCOMPUTED_PROBABILITY) {
+                                                classification.put("LeftEyeOpenProbability",face.getLeftEyeOpenProbability());
+                                            }
+                                            if (face.getRightEyeOpenProbability() != FirebaseVisionFace.UNCOMPUTED_PROBABILITY) {
+                                                classification.put("RightEyeOpenProbability",face.getRightEyeOpenProbability());
+                                            }
+                                            faceJson.put("Classification",classification);
+                                        }
+
+                                        // If face tracking was enabled:
+                                        if (faceOptions.isTrackingEnabled()) {
+                                            if (face.getTrackingId() != FirebaseVisionFace.INVALID_ID) {
+                                                faceJson.put("TrackingId",face.getTrackingId());
+                                            }
+                                        }
+                                        json.put(faceJson);
+                                    }catch (JSONException e){
+                                        e.printStackTrace();
+                                    }
+                                }
+                                callbackContext.success(json.toString());
+                            }
+                        })
+                .addOnFailureListener(
+                        new OnFailureListener() {
+                            @Override
+                            public void onFailure(@NonNull Exception e) {
+                                e.printStackTrace();
+                                callbackContext.error(e.getMessage());
+                            }
+                        });
+    }
+
+    private JSONObject faceLandmarkConvertToJson(FirebaseVisionFaceLandmark landmark) throws JSONException {
+        JSONObject landmarkJson = new JSONObject();
+        landmarkJson.put(String.valueOf(landmark.getLandmarkType()),visionPointToJson(landmark.getPosition()));
+        if (landmarkJson.get(String.valueOf(landmark.getLandmarkType())).equals(new JSONObject())){
+            return null;
+        }else{
+            return landmarkJson;
+        }
+    }
+
+    private JSONObject faceContourConvertToJson(FirebaseVisionFaceContour contour) throws JSONException {
+        JSONObject contourJson = new JSONObject();
+        contourJson.put(String.valueOf(contour.getFaceContourType()),visionPointsToJson(contour.getPoints()));
+        if (contourJson.get(String.valueOf(contour.getFaceContourType())).equals(new JSONArray())){
+            return null;
+        }else{
+            return contourJson;
+        }
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
@@ -428,6 +619,23 @@ public class MlKitPlugin extends CordovaPlugin {
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
+
+    private JSONArray visionPointsToJson(List<FirebaseVisionPoint> positions) throws JSONException {
+        JSONArray pointsJson = new JSONArray();
+        for (FirebaseVisionPoint position : positions){
+            pointsJson.put(visionPointToJson(position));
+        }
+        return pointsJson;
+    }
+
+    private JSONObject visionPointToJson(FirebaseVisionPoint position) throws JSONException {
+
+        JSONObject pointJson =  new JSONObject();
+        pointJson.put("x", position.getX());
+        pointJson.put("y", position.getY());
+        pointJson.put("z", position.getZ());
+        return pointJson;
+    }
 
 
     private JSONObject rectToJson(Rect rect) throws JSONException {
