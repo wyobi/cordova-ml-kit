@@ -81,6 +81,8 @@ public class MlKitPlugin extends CordovaPlugin {
 
     private Actions myAction;
 
+    private Boolean onCloud;
+
     public void initialize(CordovaInterface cordova, CordovaWebView webView) {
         super.initialize(cordova, webView);
         context = cordova.getActivity().getApplicationContext();
@@ -93,7 +95,24 @@ public class MlKitPlugin extends CordovaPlugin {
             if(error.isEmpty()){
                 myAction = Actions.fromString(action);
                 switch(myAction){
-                    case COOLMETHOD:
+                    case GETTEXT:
+                        onCloud = args.optBoolean(1,false);
+                        if (onCloud){
+                            options.put("language",args.optString(2,""));
+                        }
+                        if (args.optBoolean(0,false)) {
+                            try {
+                                requestPermission(Manifest.permission.CAMERA, 1);
+                            }catch(Exception e){
+                                callbackContext.error("Exception occurred on requestPermission!\n"+e.getMessage());
+                            }
+                        } else {
+                            try {
+                                requestPermission(Manifest.permission.READ_EXTERNAL_STORAGE, 1);
+                            }catch(Exception e){
+                                callbackContext.error("Exception occurred on requestPermission!\n"+e.getMessage());
+                            }
+                        }
                         break;
                 }
                 return true;
@@ -113,10 +132,12 @@ public class MlKitPlugin extends CordovaPlugin {
         boolean isValid;
         Actions a = Actions.fromString(action);
         switch (a) {
-            case COOLMETHOD:
-                isValid = args.length() == 1;
+            case GETTEXT:
+                isValid = args.length() == 3;
                 try {
-                    args.getJSONObject(0);
+                    args.getBoolean(0);
+                    args.getBoolean(1);
+                    args.getString(2);
                 } catch (JSONException e) {
                     isValid = false;
                 }
@@ -128,7 +149,7 @@ public class MlKitPlugin extends CordovaPlugin {
 
     enum Actions {
         INVALID("", "Invalid action"),
-        COOLMETHOD("coolMethod","Invalid arguments-> options: JSONObject");
+        GETTEXT("getText", "Invalid arguments-> takePicture: Bool, onCloud: Bool, language: String"),;
 
         String name;
         String argsDesc;
@@ -145,6 +166,82 @@ public class MlKitPlugin extends CordovaPlugin {
                 }
             }
             return INVALID;
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    //                               Text Recognition                             //
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+
+    private void runTextRecognition(final CallbackContext callbackContext, final Bitmap img, final String language, final Boolean onCloud) {
+
+        FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(img);
+
+        FirebaseVisionTextRecognizer textRecognizer;
+
+        if(onCloud) {
+            textRecognizer = this.getTextRecognitionCloud(language);
+        } else {
+            textRecognizer = this.getTextRecognitionDevice();
+        }
+
+        textRecognizer.processImage(image).addOnSuccessListener(texts -> {
+            try {
+                JSONObject json = new JSONObject();
+                JSONArray blocks = new JSONArray();
+
+                json.put("text", texts.getText());
+                json.put("textBlocks", blocks);
+
+                for (FirebaseVisionText.TextBlock block : texts.getTextBlocks()) {
+                    Log.d(TAG, block.getText());
+                    JSONObject oBlock = new JSONObject();
+                    JSONArray lines = new JSONArray();
+                    oBlock.put("text", block.getText());
+                    oBlock.put("confidence", block.getConfidence());
+                    oBlock.put("boundingBox", rectToJson(block.getBoundingBox()));
+                    oBlock.put("cornerPoints", pointsToJson(block.getCornerPoints()));
+                    oBlock.put("lines", lines);
+                    blocks.put(oBlock);
+
+                    for (FirebaseVisionText.Line line : block.getLines()) {
+                        JSONObject oLine = new JSONObject();
+                        oLine.put("text", line.getText());
+                        oLine.put("confidence", line.getConfidence());
+                        oLine.put("boundingBox", rectToJson(line.getBoundingBox()));
+                        oLine.put("cornerPoints", pointsToJson(line.getCornerPoints()));
+                        lines.put(oLine);
+                    }
+                }
+                callbackContext.success(json.toString());
+            } catch(JSONException e) {
+                e.printStackTrace();
+                callbackContext.error(e.getMessage());
+            }
+        }).addOnFailureListener(e -> {
+            e.printStackTrace();
+            callbackContext.error(e.getMessage());
+        });
+
+    }
+
+    private FirebaseVisionTextRecognizer getTextRecognitionDevice() {
+        return FirebaseVision.getInstance().getOnDeviceTextRecognizer();
+    }
+
+    private FirebaseVisionTextRecognizer getTextRecognitionCloud( final String language) {
+        if (!language.isEmpty()) {
+            FirebaseVisionCloudTextRecognizerOptions options = new FirebaseVisionCloudTextRecognizerOptions.Builder()
+                    .setLanguageHints(Arrays.asList(language)).build();
+
+            return FirebaseVision.getInstance()
+                    .getCloudTextRecognizer(options);
+        } else {
+            return FirebaseVision.getInstance().getCloudTextRecognizer();
         }
     }
 
@@ -208,8 +305,6 @@ public class MlKitPlugin extends CordovaPlugin {
         super.onActivityResult(requestCode,resultCode,data);
         if (resultCode == RESULT_OK){
             if (requestCode == TAKE_PICTURE_REQUEST_CODE) {
-                //Bundle extras = data.getExtras();
-                //Bitmap imageBitmap = (Bitmap) extras.get("data");
                 try{
                     Activity act = this.cordova.getActivity();
                     String packagename = act.getComponentName().getPackageName();
@@ -219,6 +314,7 @@ public class MlKitPlugin extends CordovaPlugin {
                             tempImage);
                     final Bitmap imageBitmap = MediaStore.Images.Media.getBitmap(cordova.getActivity().getContentResolver(),imageUri);
 
+                    cordova.getThreadPool().execute(() -> runTextRecognition(_callbackContext, imageBitmap, options.optString("language",""), onCloud));
                     //call text identification, label recognition, face detection
 
                     return;
@@ -231,6 +327,7 @@ public class MlKitPlugin extends CordovaPlugin {
                 try{
                     final Bitmap imageBitmap = MediaStore.Images.Media.getBitmap(cordova.getActivity().getContentResolver(),selectedImage);
                     //call text identification, label recognition, face detection
+                    cordova.getThreadPool().execute(() -> runTextRecognition(_callbackContext, imageBitmap, options.optString("language",""), onCloud));
 
                     return;
                 }catch (IOException e){
@@ -321,6 +418,40 @@ public class MlKitPlugin extends CordovaPlugin {
             Log.e(TAG, "Exception occurred onRequestPermissionsResult: ".concat(e.getMessage()));
             _callbackContext.error("Exception occurred onRequestPermissionsResult: ".concat(e.getMessage()));
         }
+    }
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    //                                 Utilities                                  //
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+
+
+    private JSONObject rectToJson(Rect rect) throws JSONException {
+        JSONObject oBloundingBox = new JSONObject();
+        oBloundingBox.put("left", rect.left);
+        oBloundingBox.put("right", rect.right);
+        oBloundingBox.put("top", rect.top);
+        oBloundingBox.put("bottom", rect.bottom);
+        return oBloundingBox;
+    }
+
+    private JSONArray pointsToJson(Point[] points) throws JSONException {
+        JSONArray aPoints = new JSONArray();
+        for (Point point: points) {
+            aPoints.put(pointToJson(point));
+        }
+        return aPoints;
+    }
+
+    private JSONObject pointToJson(Point point) throws JSONException {
+        JSONObject pointJson =  new JSONObject();
+        pointJson.put("x", point.x);
+        pointJson.put("y", point.y);
+        return pointJson;
     }
 }
 
