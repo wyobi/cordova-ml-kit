@@ -46,12 +46,18 @@ import com.google.firebase.ml.naturallanguage.FirebaseNaturalLanguage;
 import com.google.firebase.ml.naturallanguage.languageid.FirebaseLanguageIdentification;
 import com.google.firebase.ml.naturallanguage.languageid.FirebaseLanguageIdentificationOptions;
 import com.google.firebase.ml.naturallanguage.languageid.IdentifiedLanguage;
+import com.google.firebase.ml.naturallanguage.smartreply.FirebaseSmartReply;
+import com.google.firebase.ml.naturallanguage.smartreply.FirebaseTextMessage;
+import com.google.firebase.ml.naturallanguage.smartreply.SmartReplySuggestion;
+import com.google.firebase.ml.naturallanguage.smartreply.SmartReplySuggestionResult;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
 
+import java.util.HashMap;
 import java.util.List;
 
 import static android.app.Activity.RESULT_OK;
@@ -114,6 +120,38 @@ public class MlKitPlugin extends CordovaPlugin {
                         runTextIdentifier(callbackContext,options.optString("text",""),identifierOptions);
                         break;
 
+                    case REPLY:
+                        options = args.optJSONObject(0);
+                        if (options.has("Identifier")) {
+                            String identifier = options.optString("Identifier", "");
+                            if (conversations.containsKey(identifier)) {
+                                reply(callbackContext, conversations.get(identifier));
+                            } else {
+                                callbackContext.error("Conversation Identifier does not Exist!");
+                            }
+                        }else{
+                            callbackContext.error("Options Identifier propriety not found!");
+                        }
+                        break;
+                    case ADDMESSAGES:
+                        options = args.optJSONObject(0);
+
+                        if (options.has("Identifier")&& options.has("Messages")){
+                            Message[] messages = convertJsonToMessages(options.getJSONArray("Messages"));
+                            String identifier = options.getString("Identifier");
+                            addMessages(callbackContext,messages,identifier);
+                        }else{
+                            callbackContext.error("Options Identifier or Messages propriety not found!");
+                        }
+                        break;
+                    case REMOVEMESSAGE:
+                        options = args.optJSONObject(0);
+                        if (options.has("Identifier")&& options.has("MessageId")){
+                            removeMessage(options.getString("Identifier"),options.getInt("MessageId"));
+                        }else{
+                            callbackContext.error("Options Identifier or Messages propriety not found!");
+                        }
+                        break;
                 }
                 return true;
             }else{
@@ -136,6 +174,9 @@ public class MlKitPlugin extends CordovaPlugin {
             case GETLABLE:
             case GETFACE:
             case IDENTIFYLANG:
+            case REPLY:
+            case ADDMESSAGES:
+            case REMOVEMESSAGE:
                 isValid = args.length() == 1;
                 try{
                     args.getJSONObject(0);
@@ -153,7 +194,10 @@ public class MlKitPlugin extends CordovaPlugin {
         GETTEXT("getText","Invalid arguments-> options: JSONObject"),
         GETLABLE("getLabel","Invalid arguments-> options: JSONObject"),
         GETFACE("getFace","Invalid arguments-> options: JSONObject"),
-        IDENTIFYLANG("identifyLang","Invalid arguments-> options: JSONObject");
+        IDENTIFYLANG("identifyLang","Invalid arguments-> options: JSONObject"),
+        REPLY("reply","Invalid arguments-> options: JSONObject"),
+        ADDMESSAGES("addMessage","Invalid arguments-> options: JSONObject"),
+        REMOVEMESSAGE("removeMessage","Invalid arguments-> options: JSONObject");
 
         String name;
         String argsDesc;
@@ -501,6 +545,98 @@ public class MlKitPlugin extends CordovaPlugin {
                             }
                         }
                         callbackContext.success(json.toString());
+                        }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        e.printStackTrace();
+                        callbackContext.error(e.getMessage());
+                    }
+                });
+    }
+
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    //                               Smart Reply                                  //
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+
+    private HashMap<String,List<FirebaseTextMessage>> conversations;
+
+    class Message{
+        String message;
+        long timestamp;
+        String PersonId;
+    }
+
+    private void addMessages(CallbackContext callbackContext,Message[] messages,String identifier) throws JSONException {
+        for (Message message : messages){
+            addMessage(callbackContext,message,identifier);
+        }
+        callbackContext.success(convertFirebaseTextMessageToJson(conversations.get(identifier)));
+    }
+
+    private void addMessage(CallbackContext callbackContext,Message message,String identifier){
+        List<FirebaseTextMessage> conversation;
+        if (conversations == null){
+            conversations = new HashMap<>();
+            conversation = new ArrayList<>();
+        }else{
+            if (conversations.containsKey(identifier)){
+                conversation = conversations.get(identifier);
+            }else{
+                conversation = new ArrayList<>();
+            }
+        }
+        if (message.PersonId != null){
+            conversation.add(FirebaseTextMessage.createForRemoteUser(
+                    message.message, message.timestamp,message.PersonId));
+        }else {
+            conversation.add(FirebaseTextMessage.createForLocalUser(
+                    message.message, message.timestamp));
+        }
+        if (conversations.containsKey(identifier)){
+            conversations.remove(identifier);
+            conversations.put(identifier,conversation);
+        }else {
+            conversations.put(identifier,conversation);
+        }
+    }
+
+
+    private void reply(final CallbackContext callbackContext,List<FirebaseTextMessage> conversation){
+        FirebaseSmartReply smartReply = FirebaseNaturalLanguage.getInstance().getSmartReply();
+        smartReply.suggestReplies(conversation)
+                .addOnSuccessListener(new OnSuccessListener<SmartReplySuggestionResult>() {
+                    @Override
+                    public void onSuccess(SmartReplySuggestionResult result) {
+                        if (result.getStatus() == SmartReplySuggestionResult.STATUS_NOT_SUPPORTED_LANGUAGE) {
+                            // The conversation's language isn't supported, so the
+                            // the result doesn't contain any suggestions.
+                            callbackContext.error("No results");
+                        } else if (result.getStatus() == SmartReplySuggestionResult.STATUS_SUCCESS) {
+                            JSONArray json = new JSONArray();
+
+                            for (SmartReplySuggestion suggestion : result.getSuggestions()) {
+                                try {
+                                    JSONObject replyJson = new JSONObject();
+
+                                    replyJson.put("Confidence",String.valueOf(suggestion.getConfidence()));
+                                    replyJson.put("Reply",suggestion.getText());
+
+                                    json.put(replyJson);
+                                }catch (JSONException e){
+                                    e.printStackTrace();
+                                }
+                            }
+                            callbackContext.success(json.toString());
+                            // Task completed successfully
+                            // ...
+                        }
                     }
                 })
                 .addOnFailureListener(new OnFailureListener() {
@@ -510,6 +646,49 @@ public class MlKitPlugin extends CordovaPlugin {
                         callbackContext.error(e.getMessage());
                     }
                 });
+    }
+
+    private void removeMessage(String identifier,int id) throws JSONException {
+        if (conversations.containsKey(identifier)) {
+            if (conversations.get(identifier).size()>id && id >-1) {
+                conversations.get(identifier).remove(id);
+                _callbackContext.success(convertFirebaseTextMessageToJson(conversations.get(identifier)));
+            }else {
+                _callbackContext.error("Message id doesn't exist!");
+            }
+        }else{
+            _callbackContext.error("Conversation Identifier does not exist!");
+        }
+    }
+
+    private String convertFirebaseTextMessageToJson(List<FirebaseTextMessage> messages) throws JSONException {
+        JSONArray json = new JSONArray();
+        for (FirebaseTextMessage message : messages){
+            JSONObject messageJson = new JSONObject();
+            messageJson.put("message",message.zzda());
+            messageJson.put("timestamp",message.getTimestampMillis());
+            json.put(messageJson);
+        }
+        return json.toString();
+    }
+
+    private Message[] convertJsonToMessages(JSONArray json) throws JSONException {
+        Message[] messages = new Message[json.length()];
+        for (int idx = 0; idx < json.length(); idx++){
+            JSONObject message = json.getJSONObject(idx);
+            if (message.has("message") && message.has("timestamp")) {
+                messages[idx].message = message.getString("message");
+                messages[idx].timestamp = message.getLong("timestamp");
+                if (message.has("personId")) {
+                    messages[idx].PersonId = message.getString("personId");
+                }
+            }else{
+                _callbackContext.error("Message Format error.\nMessage or timestamp not found!");
+                return null;
+            }
+        }
+        return messages;
+
     }
 
     ////////////////////////////////////////////////////////////////////////////////
