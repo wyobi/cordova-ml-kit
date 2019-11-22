@@ -12,11 +12,13 @@ import FirebaseMLVision
 
 import FirebaseMLCommon
 
+import FirebaseMLNaturalLanguage
+
 var _command: CDVInvokedUrlCommand!
 
 @objc(MlKitPlugin) class MlKitPlugin : CDVPlugin,UIImagePickerControllerDelegate,UINavigationControllerDelegate{
     
-    static let LOG_TAG = "ML-Kit-Plugin";
+    static let LOG_TAG = "MLKitPlugin";
     
     var action: Actions?
     
