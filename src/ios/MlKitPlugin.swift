@@ -14,6 +14,8 @@ import FirebaseMLCommon
 
 import FirebaseMLNaturalLanguage
 
+import FirebaseMLNLLanguageID
+
 var _command: CDVInvokedUrlCommand!
 
 @objc(MlKitPlugin) class MlKitPlugin : CDVPlugin,UIImagePickerControllerDelegate,UINavigationControllerDelegate{
@@ -31,8 +33,9 @@ var _command: CDVInvokedUrlCommand!
         case GETTEXT
         case GETLABLE
         case GETFACE
+        case IDENTIFYLANG
         
-        static let allValues = [INVALID,GETTEXT,GETLABLE,GETFACE]
+        static let allValues = [INVALID,GETTEXT,GETLABLE,GETFACE,IDENTIFYLANG]
         
     }
 
@@ -340,6 +343,60 @@ var _command: CDVInvokedUrlCommand!
     }
     
     
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    //                              Language Identifier                             //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+
+    @objc(identifyLang:)
+    func identifyLang(command: CDVInvokedUrlCommand){
+        action = Actions.IDENTIFYLANG
+        _command=command
+        
+        options = (command.argument(at: 0, withDefault:["no":"no"]) as! [String:Any])
+        
+        commandDelegate.run(inBackground: {
+            let text = self.options?["text"] as? String ?? ""
+            if text.count > 0 {
+                let confidence = self.options?["confidence"] as? Float ?? 0.5
+                let langIdOptions = LanguageIdentificationOptions(confidenceThreshold: confidence)
+                self.runLanguageIdentifier(for: text,with: langIdOptions,call: command)
+            }else{
+                self.sendPluginError(message: "No Text was sent!", call: command)
+            }
+        })
+    }
+
+    func runLanguageIdentifier(for text:String,with options: LanguageIdentificationOptions, call command:CDVInvokedUrlCommand){
+        let languageId = NaturalLanguage.naturalLanguage().languageIdentification(options: options)
+        languageId.identifyPossibleLanguages(for: text, completion: {(results, error) in
+            guard error == nil, let results:[IdentifiedLanguage] = results else{
+                let errorString = error?.localizedDescription ?? "No Result"
+                self.sendPluginError(message: errorString, call: command)
+                return
+            }
+            
+            var json:[[String:Any]] = Array(repeating: ["test":"test"], count: 0)
+            for language in results{
+                var languageJson = [String:Any]()
+                if language.languageCode.elementsEqual("und") {
+                    self.sendPluginError(message: "No Result", call: command)
+                    return
+                }else{
+                    languageJson["Code"] = language.languageCode
+                    languageJson["Confidence"] = String.init(language.confidence)
+                    json.append(languageJson)
+                }
+            }
+            self.sendPluginResult(message: json, call: command)
+            
+        })
+    }
+
+
     // //////////////////////////////////////////////////////////////////////////// //
     // //////////////////////////////////////////////////////////////////////////// //
     // //////////////////////////////////////////////////////////////////////////// //
