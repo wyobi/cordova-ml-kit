@@ -16,7 +16,7 @@ var _command: CDVInvokedUrlCommand!
 
 @objc(MlKitPlugin) class MlKitPlugin : CDVPlugin,UIImagePickerControllerDelegate,UINavigationControllerDelegate{
     
-    static let LOG_TAG = "ML-Kit-Plugin";
+    static let LOG_TAG = "MLKitPlugin";
     
     var action: Actions?
     
@@ -127,7 +127,6 @@ var _command: CDVInvokedUrlCommand!
     
     @objc(getLabel:)
     func getLabel(command: CDVInvokedUrlCommand){
-        options = [String:Any]()
         action = Actions.GETLABLE
         _command=command
         
@@ -189,7 +188,6 @@ var _command: CDVInvokedUrlCommand!
 
     @objc(getFace:)
     func getFace(command: CDVInvokedUrlCommand){
-        //options = [String:Any]()
         action = Actions.GETFACE
         _command=command
         
