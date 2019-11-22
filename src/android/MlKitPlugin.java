@@ -82,44 +82,7 @@ public class MlKitPlugin extends CordovaPlugin {
                 myAction = Actions.fromString(action);
                 switch(myAction){
                     case GETTEXT:
-
-                        options = args.getJSONObject(0);
-                        if (options.optBoolean("TakePicture",false)) {
-                            try {
-                                requestPermission(Manifest.permission.CAMERA, 1);
-                            }catch(Exception e){
-                                callbackContext.error("Exception occurred on requestPermission!\n"
-                                        +e.getMessage());
-                            }
-                        } else {
-                            try {
-                                requestPermission(Manifest.permission.READ_EXTERNAL_STORAGE,
-                                        1);
-                            }catch(Exception e){
-                                callbackContext.error("Exception occurred on requestPermission!\n"
-                                        +e.getMessage());
-                            }
-                        }
-                        break;
                     case GETLABLE:
-                        options = args.getJSONObject(0);
-                        if (options.optBoolean("TakePicture",false)) {
-                            try {
-                                requestPermission(Manifest.permission.CAMERA, 1);
-                            }catch(Exception e){
-                                callbackContext.error("Exception occurred on requestPermission!\n"
-                                        +e.getMessage());
-                            }
-                        } else {
-                            try {
-                                requestPermission(Manifest.permission.READ_EXTERNAL_STORAGE,
-                                        1);
-                            }catch(Exception e){
-                                callbackContext.error("Exception occurred on requestPermission!\n"
-                                        +e.getMessage());
-                            }
-                        }
-                        break;
                     case GETFACE:
                         options = args.getJSONObject(0);
 
@@ -159,29 +122,11 @@ public class MlKitPlugin extends CordovaPlugin {
         Actions a = Actions.fromString(action);
         switch (a) {
             case GETTEXT:
-                isValid = args.length() == 3;
-                try {
-                    args.getBoolean(0);
-                    args.getBoolean(1);
-                    args.getString(2);
-                } catch (JSONException e) {
-                    isValid = false;
-                }
-                return isValid ? "" : a.argsDesc;
             case GETLABLE:
-                isValid = args.length() == 2;
-                try {
-                    args.getBoolean(0);
-                    args.getBoolean(1);
-                } catch (JSONException e) {
-                    isValid = false;
-                }
-                return isValid ? "" : a.argsDesc;
             case GETFACE:
-                isValid = args.length() == 2;
+                isValid = args.length() == 1;
                 try {
-                    args.getBoolean(0);
-                    args.getJSONObject(1);
+                    args.getJSONObject(0);
                 } catch (JSONException e) {
                     isValid = false;
                 }
@@ -193,11 +138,9 @@ public class MlKitPlugin extends CordovaPlugin {
 
     enum Actions {
         INVALID("", "Invalid action"),
-        GETTEXT("getText",
-                "Invalid arguments-> takePicture: Bool, onCloud: Bool, language: String"),
-        GETLABLE("getLabel","Invalid arguments-> takePicture: Bool, onCloud: Bool"),
-        GETFACE("getFace",
-                "Invalid arguments-> takePicture: Bool, options: JSONObject");
+        GETTEXT("getText","Invalid arguments-> options: JSONObject"),
+        GETLABLE("getLabel","Invalid arguments-> options: JSONObject"),
+        GETFACE("getFace","Invalid arguments-> options: JSONObject");
 
         String name;
         String argsDesc;

@@ -129,7 +129,6 @@ var _command: CDVInvokedUrlCommand!
     
     @objc(getLabel:)
     func getLabel(command: CDVInvokedUrlCommand){
-        options = [String:Any]()
         action = Actions.GETLABLE
         _command=command
         
@@ -191,7 +190,6 @@ var _command: CDVInvokedUrlCommand!
 
     @objc(getFace:)
     func getFace(command: CDVInvokedUrlCommand){
-        //options = [String:Any]()
         action = Actions.GETFACE
         _command=command
         
