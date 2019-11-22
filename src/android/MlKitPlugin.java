@@ -43,6 +43,9 @@ import com.google.firebase.ml.vision.face.FirebaseVisionFaceDetector;
 import com.google.firebase.ml.vision.face.FirebaseVisionFaceDetectorOptions;
 import com.google.firebase.ml.vision.face.FirebaseVisionFaceLandmark;
 import com.google.firebase.ml.naturallanguage.FirebaseNaturalLanguage;
+import com.google.firebase.ml.naturallanguage.languageid.FirebaseLanguageIdentification;
+import com.google.firebase.ml.naturallanguage.languageid.FirebaseLanguageIdentificationOptions;
+import com.google.firebase.ml.naturallanguage.languageid.IdentifiedLanguage;
 
 import java.io.File;
 import java.io.IOException;
@@ -140,6 +143,14 @@ public class MlKitPlugin extends CordovaPlugin {
                             }
                         }
                         break;
+                    case IDENTIFYLANG:
+                        options = args.optJSONObject(0);
+                        Double confidence = options.optDouble("confidence",0.5);
+                        FirebaseLanguageIdentificationOptions identifierOptions;
+                        identifierOptions = new FirebaseLanguageIdentificationOptions.Builder().setConfidenceThreshold(confidence.floatValue()).build();
+                        runTextIdentifier(callbackContext,options.optString("text",""),identifierOptions);
+                        break;
+
                 }
                 return true;
             }else{
@@ -182,6 +193,10 @@ public class MlKitPlugin extends CordovaPlugin {
                 try {
                     args.getBoolean(0);
                     args.getJSONObject(1);
+            case IDENTIFYLANG:
+                isValid = args.length() == 1;
+                try{
+                    args.getJSONObject(0);
                 } catch (JSONException e) {
                     isValid = false;
                 }
@@ -514,7 +529,47 @@ public class MlKitPlugin extends CordovaPlugin {
                             }
                         });
     }
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    //                            Language Identifier                             //
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
 
+    public void runTextIdentifier(final CallbackContext callbackContext,String text,FirebaseLanguageIdentificationOptions options){
+
+        FirebaseLanguageIdentification langIdentifier = FirebaseNaturalLanguage.getInstance().getLanguageIdentification(options);
+
+        langIdentifier.identifyPossibleLanguages(text)
+                .addOnSuccessListener(new OnSuccessListener<List<IdentifiedLanguage>>() {
+                    @Override
+                    public void onSuccess(List<IdentifiedLanguage> languages) {
+                        JSONArray json = new JSONArray();
+
+                        for (IdentifiedLanguage language : languages) {
+                            try {
+                                JSONObject languageJson = new JSONObject();
+
+                                languageJson.put("Confidence",String.valueOf(language.getConfidence()));
+                                languageJson.put("Code",language.getLanguageCode());
+
+                                json.put(languageJson);
+                            }catch (JSONException e){
+                                e.printStackTrace();
+                            }
+                        }
+                        callbackContext.success(json.toString());
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        e.printStackTrace();
+                        callbackContext.error(e.getMessage());
+                    }
+                });
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
