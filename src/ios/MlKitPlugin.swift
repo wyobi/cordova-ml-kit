@@ -403,7 +403,7 @@ var _command: CDVInvokedUrlCommand!
                     self.conversations = [String:[TextMessage]]()
                 }
                 self.conversations![identifier] = textMessages
-                self.sendPluginResult(message: self.conversations![identifier]!, call: command)
+                self.sendPluginResult(message: self.convertToJson(in: self.conversations![identifier]!), call: command)
                 return
             }
             self.sendPluginError(message: "Unexpected Error Occured!", call: command)
@@ -438,7 +438,7 @@ var _command: CDVInvokedUrlCommand!
                     return false}) {
                     if self.conversations![identifier!]!.count > id! {
                         self.conversations![identifier!]?.remove(at: id!)
-                        self.sendPluginResult(message: self.conversations![identifier!]!, call: command)
+                        self.sendPluginResult(message: self.convertToJson(in: self.conversations![identifier!]!), call: command)
                         return
                     }
                 }

@@ -677,6 +677,7 @@ public class MlKitPlugin extends CordovaPlugin {
         for (int idx = 0; idx < json.length(); idx++){
             JSONObject message = json.getJSONObject(idx);
             if (message.has("message") && message.has("timestamp")) {
+                messages[idx] = new Message();
                 messages[idx].message = message.getString("message");
                 messages[idx].timestamp = message.getLong("timestamp");
                 if (message.has("personId")) {
