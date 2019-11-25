@@ -149,7 +149,7 @@ public class MlKitPlugin extends CordovaPlugin {
                         if (options.has("Identifier")&& options.has("MessageId")){
                             removeMessage(options.getString("Identifier"),options.getInt("MessageId"));
                         }else{
-                            callbackContext.error("Options Identifier or Messages propriety not found!");
+                            callbackContext.error("Options Identifier or Id propriety not found!");
                         }
                         break;
                 }

@@ -440,9 +440,12 @@ var _command: CDVInvokedUrlCommand!
                         self.conversations![identifier!]?.remove(at: id!)
                         self.sendPluginResult(message: self.convertToJson(in: self.conversations![identifier!]!), call: command)
                         return
+                    }else{
+                        self.sendPluginError(message: "Id does not Exist", call: command)
                     }
                 }
-                
+            }else{
+                self.sendPluginError(message: "Identifier does not Exist", call: command)
             }
             self.sendPluginError(message: "Unexpected Error Occured!", call: command)
         })
@@ -476,6 +479,7 @@ var _command: CDVInvokedUrlCommand!
         }else{
             sendPluginError(message: "Options Identifier propriety not found!", call: command)
         }
+        self.sendPluginError(message: "Unexpected Error Occured!", call: command)
         
     }
 

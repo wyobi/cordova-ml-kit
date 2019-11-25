@@ -52,8 +52,8 @@ Text recognition
 
 | name        | type         | optional(default) |  description                                                                                                                      |
 | ------------|--------------|-------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| `TakePhoto` | `Bool`       | [x](false)        | indicates if it should start camera to take a photo or open photo gallery                                                         |
-| `Cloud`     | `Bool`       | [x](false)        | Indicates if it should use the cloud service from google. Much better results, but you need an active paid plan (Blaze Plan) and activate it on Google Cloud |
+| `TakePhoto` | `Bool`       | [x]`(false)`      | indicates if it should start camera to take a photo or open photo gallery                                                         |
+| `Cloud`     | `Bool`       | [x]`(false)`      | Indicates if it should use the cloud service from google. Much better results, but you need an active paid plan (Blaze Plan) and activate it on Google Cloud |
 | `Language`  | `string`     | [x]               | [Language Code](https://firebase.google.com/docs/ml-kit/android/recognize-text#1-run-the-text-recognizer), is only used on Cloud  |
 
 ###### **`Objects`**
@@ -88,8 +88,8 @@ Label recognition
 
 | name        | type         | optional(default) |  description                                                             |
 | ------------|--------------|-------------------|--------------------------------------------------------------------------|
-| `TakePhoto` | `Bool`       | [x](false)        | indicates if it should start camera to take a photo or open photo gallery|
-| `Cloud`     | `Bool`       | [x](false)        | Indicates if it should use the cloud service from google. Much better results, but you need an active paid plan (Blaze Plan) and activate it on Google Cloud |
+| `TakePhoto` | `Bool`       | [x]`(false)`      | indicates if it should start camera to take a photo or open photo gallery|
+| `Cloud`     | `Bool`       | [x]`(false)`      | Indicates if it should use the cloud service from google. Much better results, but you need an active paid plan (Blaze Plan) and activate it on Google Cloud |
 
 **`ArraySuccess`**
 
@@ -125,16 +125,17 @@ Note that when contour detection is enabled, only one face is detected, so face 
 
 | name             | type    | optional(default) | description                                                                                   |
 | -----------------|---------|-------------------|-----------------------------------------------------------------------------------------------|
-| `TakePhoto`      | `Bool`  | [x](false)        | indicates if it should start camera to take a photo or open photo gallery                     |
-| `Tracking`       | `Bool`  | [x](false)        | Whether or not to assign faces an ID, which can be used to track faces across images          |
-| `Performance`    | `int`   | [x](2)            | Favor speed or accuracy when detecting faces                                                  |
-| `Landmarks`      | `int`   | [x](2)            | Whether to attempt to identify facial "landmarks": eyes, ears, nose, cheeks, mouth, and so on |
-| `Classification` | `int`   | [x](2)            | Whether or not to classify faces into categories such as "smiling", and "eyes open"           |
-| `Contours`       | `int`   | [x](1)            | Whether to detect the contours of facial features. Contours are detected for only the most prominent face in an image | 1 (NO_CONTOURS) Default , 2 (ALL_CONTOURS) |
-| `MinFaceSize`    | `float` | [x](0.1)          | The minimum size, relative to the image, of faces to detect                                   |
+| `TakePhoto`      | `Bool`  | [x]`(false)`      | indicates if it should start camera to take a photo or open photo gallery                     |
+| `Tracking`       | `Bool`  | [x]`(false)`      | Whether or not to assign faces an ID, which can be used to track faces across images          |
+| `Performance`    | `int`   | [x]`(2)`          | Favor speed or accuracy when detecting faces                                                  |
+| `Landmarks`      | `int`   | [x]`(2)`          | Whether to attempt to identify facial "landmarks": eyes, ears, nose, cheeks, mouth, and so on |
+| `Classification` | `int`   | [x]`(2)`          | Whether or not to classify faces into categories such as "smiling", and "eyes open"           |
+| `Contours`       | `int`   | [x]`(1)`          | Whether to detect the contours of facial features. Contours are detected for only the most prominent face in an image |
+| `MinFaceSize`    | `float` | [x]`(0.1)`        | The minimum size, relative to the image, of faces to detect                                   |
 
-1 = false
-2 = true
+for int's:
+    1 = false
+    2 = true
 
 
 
@@ -257,7 +258,7 @@ Identify Language Scanning
 To create a smart Reply first you need to add the conversation so that the model can use that information to create the reply.
 
 ##### **`reply(success, error): void`**
-Smart Reply to a given conversation
+Suggest replies to a given conversation
 
 | parameter   | type                                 | description                 |
 | ----------- |--------------------------------------|-----------------------------|
@@ -303,7 +304,7 @@ Add Message to a given conversation or create one if none matches the identifica
 | --------------------|----------|-------------------|-------------------------------------------------------------|
 | `message`           | `String` | [ ]               | Message text                                                |
 | `timestamp`         | `Double` | [ ]               | Timestamp when the message was sent                         |
-| `timespersonIdtamp` | `String` | [x]               | Id of who sent the message(do not use if it's your message) |
+| `personId`          | `String` | [x]               | Id of who sent the message(do not use if it's your message) |
 
 ##### **`removeMessage(success, error): void`**
 Remove message from a given conversation
