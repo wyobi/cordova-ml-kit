@@ -12,6 +12,11 @@ import FirebaseMLVision
 
 import FirebaseMLCommon
 
+import FirebaseMLNaturalLanguage
+
+import FirebaseMLNLLanguageID
+import FirebaseMLNLSmartReply
+
 var _command: CDVInvokedUrlCommand!
 
 @objc(MlKitPlugin) class MlKitPlugin : CDVPlugin,UIImagePickerControllerDelegate,UINavigationControllerDelegate{
@@ -29,8 +34,12 @@ var _command: CDVInvokedUrlCommand!
         case GETTEXT
         case GETLABLE
         case GETFACE
+        case IDENTIFYLANG
+        case REPLY
+        case ADDMESSAGE
+        case REMOVEMESSAGE
         
-        static let allValues = [INVALID,GETTEXT,GETLABLE,GETFACE]
+        static let allValues = [INVALID,GETTEXT,GETLABLE,GETFACE,IDENTIFYLANG,REPLY,ADDMESSAGE,REMOVEMESSAGE]
         
     }
 
@@ -336,8 +345,247 @@ var _command: CDVInvokedUrlCommand!
             
         })
     }
+
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    //                                Smart Reply                                   //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+
+    var conversations:[String:[TextMessage]]?
+
+    @objc(addMessage:)
+    func addMessage(command: CDVInvokedUrlCommand){
+        //options = [String:Any]()
+        action = Actions.ADDMESSAGE
+        _command=command
+        
+        options = (command.argument(at: 0, withDefault:["no":"no"]) as! [String:Any])
+        
+        conversations = [String:[TextMessage]]()
+        
+        commandDelegate.run(inBackground: {
+            var identifier = ""
+            var textMessages:[TextMessage] = [TextMessage]()
+            self.options!.contains(where: { (key,value) in
+                if key.elementsEqual("Identifier"){
+                    identifier = value as! String
+                }else if key.elementsEqual("Messages"){
+                    let messages:[[String:Any]] = value as! Array
+                    for message in messages {
+                        var text = ""
+                        var timestamp = 0.0
+                        var id:String?
+                        message.contains(where: { (key,value) in
+                            if key.elementsEqual("message"){
+                                text = value as! String
+                            }else if key.elementsEqual("timestamp"){
+                                timestamp = value as! Double
+                            }else if key.elementsEqual("personId"){
+                                id = value as? String
+                            }
+                            return false
+                        })
+                        
+                        let local = !(id?.isEmpty ?? true)
+                        
+                        let textMessage = TextMessage(text: text, timestamp: timestamp, userID: id ?? "LocalId", isLocalUser: local)
+                        textMessages.append(textMessage)
+                    }
+                    
+                }
+                return false
+            })
+            if !identifier.isEmpty && textMessages.count>0{
+                if self.conversations == nil {
+                    self.conversations = [String:[TextMessage]]()
+                }
+                self.conversations![identifier] = textMessages
+                self.sendPluginResult(message: self.convertToJson(in: self.conversations![identifier]!), call: command)
+                return
+            }
+            self.sendPluginError(message: "Unexpected Error Occured!", call: command)
+        })
+    }
+    
+    @objc(removeMessage:)
+    func removeMessage(command: CDVInvokedUrlCommand){
+        //options = [String:Any]()
+        action = Actions.REMOVEMESSAGE
+        _command=command
+        
+        options = (command.argument(at: 0, withDefault:["no":"no"]) as! [String:Any])
+        
+        commandDelegate.run(inBackground: {
+            var identifier:String?
+            var id:Int?
+            self.options!.contains(where: { (key,value) in
+                if key.elementsEqual("Identifier"){
+                    identifier = value as? String
+                }else if key.elementsEqual("Id"){
+                    id = value as? Int
+                }
+                return false
+            })
+            
+            if (identifier != nil) && (id != nil) && (self.conversations != nil) {
+                if self.conversations!.contains(where: { (key,value) in
+                    if key.elementsEqual(identifier!){
+                        return true
+                    }
+                    return false}) {
+                    if self.conversations![identifier!]!.count > id! {
+                        self.conversations![identifier!]?.remove(at: id!)
+                        self.sendPluginResult(message: self.convertToJson(in: self.conversations![identifier!]!), call: command)
+                        return
+                    }else{
+                        self.sendPluginError(message: "Id does not Exist", call: command)
+                    }
+                }
+            }else{
+                self.sendPluginError(message: "Identifier does not Exist", call: command)
+            }
+            self.sendPluginError(message: "Unexpected Error Occured!", call: command)
+        })
+    }
+    
+    @objc(reply:)
+    func reply(command: CDVInvokedUrlCommand){
+        //options = [String:Any]()
+        action = Actions.REPLY
+        _command=command
+        
+        options = (command.argument(at: 0, withDefault:["no":"no"]) as! [String:Any])
+        
+        if self.options!.contains(where: { (key,value) in
+            if key.elementsEqual("Identifier"){
+                return true
+            }
+            return false
+        }){
+            let identifier = options!["Identifier"] as? String ?? ""
+            if conversations?.contains(where: { (key,value) in
+                if key.elementsEqual(identifier){
+                    return true
+                }
+                return false
+            }) ?? false{
+                reply(to:conversations![identifier]!,call: command)
+            }else{
+                sendPluginError(message: "Conversation doesn't exist!", call: command)
+            }
+        }else{
+            sendPluginError(message: "Options Identifier propriety not found!", call: command)
+        }
+        self.sendPluginError(message: "Unexpected Error Occured!", call: command)
+        
+    }
+
+    func reply(to conversation:[TextMessage], call command:CDVInvokedUrlCommand){
+        let smartReplier = NaturalLanguage.naturalLanguage().smartReply()
+        
+        smartReplier.suggestReplies(for: conversation) { result, error in
+            guard error == nil, let results = result else {
+                let errorString = error?.localizedDescription ?? "No Result"
+                self.sendPluginError(message: errorString, call: command)
+                return
+            }
+            if (results.status == .notSupportedLanguage) {
+                self.sendPluginError(message: "No Result", call: command)
+                return
+            } else if (results.status == .success) {
+                var json:[[String:Any]] = Array(repeating: ["test":"test"], count: 0)
+                for reply in results.suggestions{
+                    var replyJson = [String:Any]()
+                    replyJson["Reply"] = reply.text
+                    json.append(replyJson)
+                    
+                }
+                self.sendPluginResult(message: json, call: command)
+            }
+        }
+    }
+
+    func convertToJson(in json:[TextMessage])->String{
+        var finalString = "["
+        var notFirst = false
+        for item in json {
+            if notFirst {
+                finalString += ","
+            }else{
+                notFirst = true
+            }
+            finalString += convertToJson(in :textMessageToJson(for: item))
+        }
+        finalString += "]"
+        return finalString
+    }
+    
+    func textMessageToJson(for message: TextMessage) -> [String:Any] {
+        var aMessage = [String:Any]()
+        aMessage["text"] = message.text
+        aMessage["timestamp"] = String.init(message.timestamp)
+        
+        return aMessage
+    }
     
     
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    //                              Language Identifier                             //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+    // //////////////////////////////////////////////////////////////////////////// //
+
+    @objc(identifyLang:)
+    func identifyLang(command: CDVInvokedUrlCommand){
+        action = Actions.IDENTIFYLANG
+        _command=command
+        
+        options = (command.argument(at: 0, withDefault:["no":"no"]) as! [String:Any])
+        
+        commandDelegate.run(inBackground: {
+            let text = self.options?["text"] as? String ?? ""
+            if text.count > 0 {
+                let confidence = self.options?["confidence"] as? Float ?? 0.5
+                let langIdOptions = LanguageIdentificationOptions(confidenceThreshold: confidence)
+                self.runLanguageIdentifier(for: text,with: langIdOptions,call: command)
+            }else{
+                self.sendPluginError(message: "No Text was sent!", call: command)
+            }
+        })
+    }
+
+    func runLanguageIdentifier(for text:String,with options: LanguageIdentificationOptions, call command:CDVInvokedUrlCommand){
+        let languageId = NaturalLanguage.naturalLanguage().languageIdentification(options: options)
+        languageId.identifyPossibleLanguages(for: text, completion: {(results, error) in
+            guard error == nil, let results:[IdentifiedLanguage] = results else{
+                let errorString = error?.localizedDescription ?? "No Result"
+                self.sendPluginError(message: errorString, call: command)
+                return
+            }
+            
+            var json:[[String:Any]] = Array(repeating: ["test":"test"], count: 0)
+            for language in results{
+                var languageJson = [String:Any]()
+                if language.languageCode.elementsEqual("und") {
+                    self.sendPluginError(message: "No Result", call: command)
+                    return
+                }else{
+                    languageJson["Code"] = language.languageCode
+                    languageJson["Confidence"] = String.init(language.confidence)
+                    json.append(languageJson)
+                }
+            }
+            self.sendPluginResult(message: json, call: command)
+            
+        })
+    }
+
+
     // //////////////////////////////////////////////////////////////////////////// //
     // //////////////////////////////////////////////////////////////////////////// //
     // //////////////////////////////////////////////////////////////////////////// //
