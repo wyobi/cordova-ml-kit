@@ -21,9 +21,6 @@
             </feature>
         </config-file>
 
-        <hook type="after_plugin_install" src="hooks/android/after_plugin_install.js" />
-        <hook type="before_plugin_uninstall" src="hooks/android/before_plugin_uninstall.js" />
-
         <source-file src="src/android/MlKitPlugin.java" target-dir="src/com/outsystems/mlkitplugin/MlKitPlugin" />
 
         <config-file parent="/*" target="AndroidManifest.xml">
@@ -59,13 +56,6 @@
 
 
     <platform name="ios">
-
-        <hook type="after_platform_add" src="hooks/ios/add-swift-support.js" />
-        <hook type="after_plugin_add" src="hooks/ios/add-swift-support.js" />
-
-
-        <hook type="after_platform_add" src="hooks/ios/build-modifier.js" />
-        <hook type="after_plugin_add" src="hooks/ios/build-modifier.js" />
 
         <config-file parent="/*" target="config.xml">
             <feature name="MlKitPlugin">
