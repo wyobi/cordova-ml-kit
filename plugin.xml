@@ -70,8 +70,6 @@
         <header-file src="src/ios/AppDelegate+MLPlugin.h" />
 		<source-file src="src/ios/AppDelegate+MLPlugin.m" />
 
-        <resource-file src="GoogleService-Info.plist" target="./GoogleService-Info.plist" />
-
         <framework src="FirebaseMLVision" type="podspec" spec="~>0.15.0"/>
         <framework src="FirebaseAnalytics" type="podspec" spec="~>5.4.0" />
         <framework src="FirebaseMLVisionTextModel" type="podspec" spec="~>0.15.0" />
