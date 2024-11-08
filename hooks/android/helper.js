@@ -24,7 +24,7 @@ function addDependencies(buildGradle) {
   var whitespace = match[1];
   
   // modify the line to add the necessary dependencies
-  var googlePlayDependency = whitespace + 'classpath \'com.google.gms:google-services:4.2.0\' // google-services dependency from com.outsystems.mlkitplugin';
+  var googlePlayDependency = whitespace + 'classpath \'com.google.gms:google-services:${cordovaConfig.GRADLE_PLUGIN_GOOGLE_SERVICES_VERSION}\' // google-services dependency from com.outsystems.mlkitplugin';
   var fabricDependency = whitespace + 'classpath \'io.fabric.tools:gradle:1.25.4\' // fabric dependency from com.outsystems.mlkitplugin'
   var modifiedLine = match[0] + '\n' + googlePlayDependency + '\n' + fabricDependency;
   
