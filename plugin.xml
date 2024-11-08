@@ -70,14 +70,13 @@
         <header-file src="src/ios/AppDelegate+MLPlugin.h" />
 		<source-file src="src/ios/AppDelegate+MLPlugin.m" />
 
-        <framework src="FirebaseMLVision" type="podspec" spec="~>0.15.0"/>
-        <framework src="FirebaseAnalytics" type="podspec" spec="~>5.4.0" />
-        <framework src="FirebaseMLVisionTextModel" type="podspec" spec="~>0.15.0" />
-        <framework src="FirebaseMLVisionLabelModel" type="podspec" spec="~>0.15.0" />
-        <framework src="FirebaseMLVisionFaceModel" type="podspec" spec="~>0.15.0" />
-        <framework src="FirebaseMLNaturalLanguage" type="podspec" spec="~>0.15.0" />
-        <framework src="FirebaseMLNLLanguageID" type="podspec" spec="~>0.15.0" />
-        <framework src="FirebaseMLNLSmartReply" type="podspec" spec="~>0.15.0" />
-
+        <podspec name="FirebaseMLVision" spec="~>0.15.0"/>
+        <podspec name="FirebaseAnalytics" spec="~>5.4.0" />
+        <podspec name="FirebaseMLVisionTextModel" spec="~>0.15.0" />
+        <podspec name="FirebaseMLVisionLabelModel" spec="~>0.15.0" />
+        <podspec name="FirebaseMLVisionFaceModel" spec="~>0.15.0" />
+        <podspec name="FirebaseMLNaturalLanguage" spec="~>0.15.0" />
+        <podspec name="FirebaseMLNLLanguageID" spec="~>0.15.0" />
+        <podspec name="FirebaseMLNLSmartReply" spec="~>0.15.0" />
     </platform>
 </plugin>
