@@ -5,11 +5,7 @@
         <clobbers target="cordova.MlKitPlugin" />
     </js-module>
 
-    <hook type="before_plugin_install" src="hooks/configurations/installDependencies.js" />
-    <hook type="before_plugin_install" src="hooks/configurations/unzipAndCopyConfigurations.js" />
-
     <hook type="after_prepare" src="hooks/ios/add-swift-support.js" />
-
     <hook type="after_prepare" src="scripts/after_prepare.js" />
 
     <platform name="android">
@@ -20,6 +16,9 @@
                 <param name="onload" value="true" />
             </feature>
         </config-file>
+
+        <hook type="after_plugin_install" src="hooks/android/after_plugin_install.js" />
+        <hook type="before_plugin_uninstall" src="hooks/android/before_plugin_uninstall.js" />
 
         <source-file src="src/android/MlKitPlugin.java" target-dir="src/com/outsystems/mlkitplugin/MlKitPlugin" />
 
@@ -56,6 +55,13 @@
 
 
     <platform name="ios">
+
+        <hook type="after_platform_add" src="hooks/ios/add-swift-support.js" />
+        <hook type="after_plugin_add" src="hooks/ios/add-swift-support.js" />
+
+
+        <hook type="after_platform_add" src="hooks/ios/build-modifier.js" />
+        <hook type="after_plugin_add" src="hooks/ios/build-modifier.js" />
 
         <config-file parent="/*" target="config.xml">
             <feature name="MlKitPlugin">
